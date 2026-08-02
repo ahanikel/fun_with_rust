@@ -991,8 +991,35 @@ impl CPU {
             (Instruction::LDA, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::TAX, AddrMode::Implied, _) => Cycle(0),
             (Instruction::LDY, AddrMode::Accumulator, _) => Cycle(0),
-            (Instruction::LDA, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::LDX, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::LDA, AddrMode::Absolute, 2) => self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
+            (Instruction::LDA, AddrMode::Absolute, 3) => self.load_memory_byte_hi(Self::addr_add(self.pc, 2)),
+            (Instruction::LDA, AddrMode::Absolute, 4) => {
+                self.tmp_addr = u16::from_le_bytes(self.tmp);
+                self.load_memory_byte_lo(self.tmp_addr);
+                self.a = self.tmp[0];
+                if self.a == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.a >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(3)
+            }
+
+            (Instruction::LDX, AddrMode::Absolute, 2) => self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
+            (Instruction::LDX, AddrMode::Absolute, 3) => self.load_memory_byte_hi(Self::addr_add(self.pc, 2)),
+            (Instruction::LDX, AddrMode::Absolute, 4) => {
+                self.tmp_addr = u16::from_le_bytes(self.tmp);
+                self.load_memory_byte_lo(self.tmp_addr);
+                self.x = self.tmp[0];
+                if self.x == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.x >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(3)
+            }
+
             (Instruction::BBS2, AddrMode::ProgramCounterRelative, _) => Cycle(0),
 
             (Instruction::BCS, AddrMode::ProgramCounterRelative, 2)
