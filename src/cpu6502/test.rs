@@ -1,6 +1,8 @@
+use super::*;
+
 #[test]
 fn test_brk_rti() {
-    let mut cpu = super::CPU::new();
+    let mut cpu = CPU::new();
     cpu.reset();
     cpu.mem[0xfffe] = 0xee;
     cpu.mem[0xffff] = 0xee;
@@ -13,7 +15,7 @@ fn test_brk_rti() {
 
 #[test]
 fn test_jsr_ret() {
-    let mut cpu = super::CPU::new();
+    let mut cpu = CPU::new();
     cpu.mem[0xfffc] = 0xcc;
     cpu.mem[0xfffd] = 0xcc;
     cpu.mem[0xcccc] = 0x20; // JSR
@@ -29,15 +31,75 @@ fn test_jsr_ret() {
 
 #[test]
 fn test_beq() {
-    let mut cpu = super::CPU::new();
+    let mut cpu = CPU::new();
     cpu.mem[0xfffc] = 0xaa;
     cpu.mem[0xfffd] = 0xaa;
     cpu.mem[0xaaaa] = 0xf0; // BEQ
     cpu.mem[0xaaab] = 0xc0;
     cpu.reset();
-    cpu.set_flag(super::StatusFlag::Zero);
+    cpu.set_flag(StatusFlag::Zero);
     for step in 0..36 {
         print!("Step {step}: ");
         cpu.step();
     }
+}
+
+#[test]
+fn test_cmp_zpx_ind_lt() {
+    let mut cpu = CPU::new();
+    cpu.reset();
+    cpu.pc = 0x1000;
+    cpu.a = 0x55;
+    cpu.x = 1;
+    cpu.mem[0x50] = 0x99;
+    cpu.mem[0x51] = 0x99;
+    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
+    cpu.mem[0x1001] = 0x4f;
+    cpu.mem[0x9999] = 0xf0;
+    for _step in 0..15 {
+        cpu.step();
+    }
+    assert!(cpu.st.is_set(StatusFlag::Negative));
+    assert!(cpu.st.is_clear(StatusFlag::Zero));
+    assert!(cpu.st.is_clear(StatusFlag::Carry));
+}
+
+#[test]
+fn test_cmp_zpx_ind_eq() {
+    let mut cpu = CPU::new();
+    cpu.reset();
+    cpu.pc = 0x1000;
+    cpu.a = 0x55;
+    cpu.x = 1;
+    cpu.mem[0x50] = 0x99;
+    cpu.mem[0x51] = 0x99;
+    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
+    cpu.mem[0x1001] = 0x4f;
+    cpu.mem[0x9999] = 0x55;
+    for _step in 0..15 {
+        cpu.step();
+    }
+    assert!(cpu.st.is_clear(StatusFlag::Negative));
+    assert!(cpu.st.is_set(StatusFlag::Zero));
+    assert!(cpu.st.is_set(StatusFlag::Carry));
+}
+
+#[test]
+fn test_cmp_zpx_ind_gt() {
+    let mut cpu = CPU::new();
+    cpu.reset();
+    cpu.pc = 0x1000;
+    cpu.a = 0xfe;
+    cpu.x = 1;
+    cpu.mem[0x50] = 0x99;
+    cpu.mem[0x51] = 0x99;
+    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
+    cpu.mem[0x1001] = 0x4f;
+    cpu.mem[0x9999] = 0x55;
+    for _step in 0..15 {
+        cpu.step();
+    }
+    assert!(cpu.st.is_clear(StatusFlag::Negative));
+    assert!(cpu.st.is_clear(StatusFlag::Zero));
+    assert!(cpu.st.is_set(StatusFlag::Carry));
 }

@@ -15,10 +15,12 @@ pub struct CPU {
     nmi_prev: bool, // previous state of the NMIB pin to detect negative transition
     reset: bool,
     tmp: [u8; 2],
+    tmp_addr: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum StatusFlag {
+    None,
     Carry,
     Zero,
     IRQDisable,
@@ -32,6 +34,7 @@ impl From<u8> for StatusFlag {
     fn from(value: u8) -> Self {
         let value: usize = value.into();
         [
+            Self::None,
             Self::Carry,
             Self::Zero,
             Self::IRQDisable,
@@ -46,7 +49,8 @@ impl From<u8> for StatusFlag {
 impl Into<u8> for StatusFlag {
     fn into(self) -> u8 {
         match self {
-            StatusFlag::Carry => 0,
+            StatusFlag::None => 0,
+            StatusFlag::Carry => 1,
             StatusFlag::Zero => 2,
             StatusFlag::IRQDisable => 4,
             StatusFlag::Decimal => 8,
@@ -605,6 +609,7 @@ impl CPU {
             nmi_prev: false,
             reset: false,
             tmp: [0, 0],
+            tmp_addr: 0,
         }
     }
     fn _load_memory_byte_lo(&mut self, addr: u16) {
@@ -746,6 +751,21 @@ impl CPU {
         self.clear_flags(disable);
         self.cycle.plus(1)
     }
+    fn load_zp_arg(&mut self) -> Cycle {
+        let addr: u16 = Self::addr_add(self.pc, 1);
+        self.tmp[1] = 0;
+        self.load_memory_byte_lo(addr)
+    }
+    fn load_indexed_x_lo(&mut self) -> Cycle {
+        let addr: u16 = u16::from_le_bytes(self.tmp);
+        self.tmp_addr = Self::addr_add(addr, self.x) & 0xff;
+        self.load_memory_byte_lo(self.tmp_addr)
+    }
+    fn load_indexed_x_hi(&mut self) -> Cycle {
+        let ret = self.load_memory_byte_hi(self.tmp_addr);
+        self.tmp_addr = u16::from_le_bytes(self.tmp);
+        ret
+    }
     pub fn step(&mut self) {
         if self.reset {
             match self.cycle.0 {
@@ -779,7 +799,10 @@ impl CPU {
             (Instruction::BRK, AddrMode::Stack, 3) => self.stack_push_pc_hi(2),
             (Instruction::BRK, AddrMode::Stack, 4) => {
                 self.stack_push_flags();
-                self.change_flags( &[StatusFlag::BRK, StatusFlag::IRQDisable], &[StatusFlag::Decimal],)
+                self.change_flags(
+                    &[StatusFlag::BRK, StatusFlag::IRQDisable],
+                    &[StatusFlag::Decimal],
+                )
             }
             (Instruction::BRK, AddrMode::Stack, 5) => self.load_memory_byte_lo(0xfffe),
             (Instruction::BRK, AddrMode::Stack, 6) => {
@@ -861,7 +884,10 @@ impl CPU {
             (Instruction::EOR, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::LSR, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::RMB4, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::PHA, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PHA, AddrMode::Stack, 2) => self.stack_push_byte(self.a),
+            (Instruction::PHA, AddrMode::Stack, 3) => self.inc_pc(1),
+
             (Instruction::EOR, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::LSR, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::JMP, AddrMode::Absolute, _) => Cycle(0),
@@ -967,7 +993,29 @@ impl CPU {
             (Instruction::LDX, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
             (Instruction::BBS3, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::CPY, AddrMode::Immediate, _) => Cycle(0),
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_zp_arg(),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 3) => self.load_indexed_x_lo(),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 4) => self.load_indexed_x_hi(),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 5) => self.load_memory_byte_lo(self.tmp_addr),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 6) => {
+                match self.a.cmp(&self.tmp[0]) {
+                    std::cmp::Ordering::Less => self.change_flags(
+                        &[StatusFlag::Negative],
+                        &[StatusFlag::Carry, StatusFlag::Zero],
+                    ),
+                    std::cmp::Ordering::Equal => self.change_flags(
+                        &[StatusFlag::Zero, StatusFlag::Carry],
+                        &[StatusFlag::Negative],
+                    ),
+                    std::cmp::Ordering::Greater => self.change_flags(
+                        &[StatusFlag::Carry],
+                        &[StatusFlag::Zero, StatusFlag::Negative],
+                    ),
+                };
+                self.inc_pc(2)
+            }
+
             (Instruction::CPY, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::CMP, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::DEC, AddrMode::ZeroPage, _) => Cycle(0),
@@ -988,7 +1036,10 @@ impl CPU {
             (Instruction::SMB5, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::CLD, AddrMode::Implied, _) => Cycle(0),
             (Instruction::CMP, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
-            (Instruction::PHX, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PHX, AddrMode::Stack, 2) => self.stack_push_byte(self.x),
+            (Instruction::PHX, AddrMode::Stack, 3) => self.inc_pc(1),
+
             (Instruction::STP, AddrMode::Implied, _) => Cycle(0),
             (Instruction::CMP, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::DEC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -1007,10 +1058,16 @@ impl CPU {
             (Instruction::INC, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBS6, AddrMode::ProgramCounterRelative, _) => Cycle(0),
 
-            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 2) if self.st.is_set(StatusFlag::Zero) =>
-                self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
-            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 3) if self.st.is_set(StatusFlag::Zero) =>
-                self.inc_pc(self.tmp[0]),
+            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_set(StatusFlag::Zero) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_set(StatusFlag::Zero) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
             (Instruction::BEQ, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
 
             (Instruction::SBC, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
