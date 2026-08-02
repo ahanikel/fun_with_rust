@@ -994,7 +994,19 @@ impl CPU {
             (Instruction::LDA, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::LDX, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBS2, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BCS, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BCS, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_set(StatusFlag::Carry) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BCS, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_set(StatusFlag::Carry) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
+            (Instruction::BCS, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
             (Instruction::LDA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::LDA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::LDY, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
@@ -1013,17 +1025,25 @@ impl CPU {
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_byte_arg(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 3) => self.load_indexed_x_lo(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 4) => self.load_indexed_x_hi(),
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 5) => self.load_memory_byte_lo(self.tmp_addr),
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 6) => { self.compare_and_set_flags(self.tmp[0]); self.inc_pc(2) }
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 5) => {
+                self.load_memory_byte_lo(self.tmp_addr)
+            }
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 6) => {
+                self.compare_and_set_flags(self.tmp[0]);
+                self.inc_pc(2)
+            }
 
             (Instruction::CPY, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::CMP, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::DEC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB4, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::INY, AddrMode::Implied, _) => Cycle(0),
-            
+
             (Instruction::CMP, AddrMode::Immediate, 2) => self.load_byte_arg(),
-            (Instruction::CMP, AddrMode::Immediate, 3) => { self.compare_and_set_flags(self.tmp[0]); self.inc_pc(2) }
+            (Instruction::CMP, AddrMode::Immediate, 3) => {
+                self.compare_and_set_flags(self.tmp[0]);
+                self.inc_pc(2)
+            }
 
             (Instruction::DEX, AddrMode::Implied, _) => Cycle(0),
             (Instruction::WAI, AddrMode::Implied, _) => Cycle(0),
