@@ -634,6 +634,10 @@ impl CPU {
         let addr: usize = addr.into();
         self.mem[addr] = byte;
     }
+    fn store_memory_byte(&mut self, addr: u16, byte: u8) -> Cycle {
+        self._store_memory_byte(addr, byte);
+        self.cycle.plus(1)
+    }
     pub fn reset(&mut self) {
         self._load_memory_byte_lo(0xfffc);
         self._load_memory_byte_hi(0xfffd);
@@ -751,10 +755,14 @@ impl CPU {
         self.clear_flags(disable);
         self.cycle.plus(1)
     }
-    fn load_byte_arg(&mut self) -> Cycle {
+    fn load_byte_arg_lo(&mut self) -> Cycle {
         let addr: u16 = Self::addr_add(self.pc, 1);
         self.tmp[1] = 0;
         self.load_memory_byte_lo(addr)
+    }
+    fn load_byte_arg_hi(&mut self) -> Cycle {
+        let addr: u16 = Self::addr_add(self.pc, 2);
+        self.load_memory_byte_hi(addr)
     }
     fn load_indexed_x_lo(&mut self) -> Cycle {
         let addr: u16 = u16::from_le_bytes(self.tmp);
@@ -834,7 +842,7 @@ impl CPU {
             (Instruction::PHP, AddrMode::Stack, _) => Cycle(0),
 
             (Instruction::ORA, AddrMode::Immediate, 2) => {
-                self.load_byte_arg();
+                self.load_byte_arg_lo();
                 self.a = self.a | self.tmp[0];
                 if self.a == 0 {
                     self.set_flag(StatusFlag::Zero);
@@ -882,7 +890,7 @@ impl CPU {
             (Instruction::PLP, AddrMode::Stack, _) => Cycle(0),
 
             (Instruction::AND, AddrMode::Immediate, 2) => {
-                self.load_byte_arg();
+                self.load_byte_arg_lo();
                 self.a = self.a & self.tmp[0];
                 if self.a == 0 {
                     self.set_flag(StatusFlag::Zero);
@@ -984,9 +992,28 @@ impl CPU {
             (Instruction::DEY, AddrMode::Implied, _) => Cycle(0),
             (Instruction::BIT, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::TXA, AddrMode::Implied, _) => Cycle(0),
-            (Instruction::STY, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::STA, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::STX, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::STY, AddrMode::Absolute, 2) => self.load_byte_arg_lo(),
+            (Instruction::STY, AddrMode::Absolute, 3) => self.load_byte_arg_hi(),
+            (Instruction::STY, AddrMode::Absolute, 4) => {
+                let addr = u16::from_le_bytes(self.tmp);
+                self.store_memory_byte(addr, self.y)
+            }
+
+            (Instruction::STA, AddrMode::Absolute, 2) => self.load_byte_arg_lo(),
+            (Instruction::STA, AddrMode::Absolute, 3) => self.load_byte_arg_hi(),
+            (Instruction::STA, AddrMode::Absolute, 4) => {
+                let addr = u16::from_le_bytes(self.tmp);
+                self.store_memory_byte(addr, self.a)
+            }
+
+            (Instruction::STX, AddrMode::Absolute, 2) => self.load_byte_arg_lo(),
+            (Instruction::STX, AddrMode::Absolute, 3) => self.load_byte_arg_hi(),
+            (Instruction::STX, AddrMode::Absolute, 4) => {
+                let addr = u16::from_le_bytes(self.tmp);
+                self.store_memory_byte(addr, self.x)
+            }
+
             (Instruction::BBS0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::BCC, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::STA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
@@ -1071,7 +1098,7 @@ impl CPU {
             (Instruction::BBS3, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::CPY, AddrMode::Immediate, _) => Cycle(0),
 
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_byte_arg(),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_byte_arg_lo(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 3) => self.load_indexed_x_lo(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 4) => self.load_indexed_x_hi(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 5) => {
@@ -1088,7 +1115,7 @@ impl CPU {
             (Instruction::SMB4, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::INY, AddrMode::Implied, _) => Cycle(0),
 
-            (Instruction::CMP, AddrMode::Immediate, 2) => self.load_byte_arg(),
+            (Instruction::CMP, AddrMode::Immediate, 2) => self.load_byte_arg_lo(),
             (Instruction::CMP, AddrMode::Immediate, 3) => {
                 self.compare_and_set_flags(self.tmp[0]);
                 self.inc_pc(2)
