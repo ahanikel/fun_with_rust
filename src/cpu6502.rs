@@ -864,7 +864,12 @@ impl CPU {
             (Instruction::ORA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::ASL, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::RMB1, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::CLC, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::CLC, AddrMode::Implied, 2) => {
+                self.clear_flag(StatusFlag::Carry);
+                self.inc_pc(1)
+            }
+
             (Instruction::ORA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
             (Instruction::INC, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::TRB, AddrMode::Absolute, _) => Cycle(0),
@@ -912,7 +917,12 @@ impl CPU {
             (Instruction::AND, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::ROL, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::RMB3, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::SEC, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::SEC, AddrMode::Implied, 2) => {
+                self.set_flag(StatusFlag::Carry);
+                self.inc_pc(1)
+            }
+
             (Instruction::AND, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
             (Instruction::DEC, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::BIT, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -946,7 +956,12 @@ impl CPU {
             (Instruction::EOR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::LSR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::RMB5, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::CLI, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::CLI, AddrMode::Implied, 2) => {
+                self.clear_flag(StatusFlag::IRQDisable);
+                self.inc_pc(1)
+            }
+
             (Instruction::EOR, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
             (Instruction::PHY, AddrMode::Stack, _) => Cycle(0),
             (Instruction::EOR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -987,7 +1002,12 @@ impl CPU {
             (Instruction::ADC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::ROR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::RMB7, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::SEI, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::SEI, AddrMode::Implied, 2) => {
+                self.set_flag(StatusFlag::IRQDisable);
+                self.inc_pc(1)
+            }
+
             (Instruction::ADC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
 
             (Instruction::PLY, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
