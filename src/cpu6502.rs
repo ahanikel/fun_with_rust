@@ -1,23 +1,24 @@
-use std::collections::HashSet;
+mod test;
 
 pub struct CPU {
     a: u8,
     x: u8,
     y: u8,
-    st: ProcessorStatus,
+    st: StatusFlags,
     pc: u16,
     sp: u8,
-    cycle: u8,
+    cycle: Cycle,
     mem: [u8; 65536],
     irq: bool,      // true if the IRQB pin is set to low
     irq_prev: bool, // previous state of the IRQB pin to detect negative transition
     nmi: bool,      // true if the NMIB pin is set to low
     nmi_prev: bool, // previous state of the NMIB pin to detect negative transition
     reset: bool,
+    tmp: [u8; 2],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum StatusFlags {
+enum StatusFlag {
     Carry,
     Zero,
     IRQDisable,
@@ -27,7 +28,7 @@ enum StatusFlags {
     Negative,
 }
 
-impl From<u8> for StatusFlags {
+impl From<u8> for StatusFlag {
     fn from(value: u8) -> Self {
         let value: usize = value.into();
         [
@@ -42,76 +43,38 @@ impl From<u8> for StatusFlags {
     }
 }
 
-impl Into<u8> for StatusFlags {
+impl Into<u8> for StatusFlag {
     fn into(self) -> u8 {
         match self {
-            StatusFlags::Carry => 0,
-            StatusFlags::Zero => 2,
-            StatusFlags::IRQDisable => 4,
-            StatusFlags::Decimal => 8,
-            StatusFlags::BRK => 16,
-            StatusFlags::Overflow => 64,
-            StatusFlags::Negative => 128,
+            StatusFlag::Carry => 0,
+            StatusFlag::Zero => 2,
+            StatusFlag::IRQDisable => 4,
+            StatusFlag::Decimal => 8,
+            StatusFlag::BRK => 16,
+            StatusFlag::Overflow => 64,
+            StatusFlag::Negative => 128,
         }
     }
 }
+
+struct StatusFlags(u8);
 
 impl StatusFlags {
-    fn from_u8(value: u8) -> HashSet<Self> {
-        let mut ret = HashSet::new();
-        if (value & 1) != 0 {
-            ret.insert(StatusFlags::Carry);
-        }
-        if (value & 2) != 0 {
-            ret.insert(StatusFlags::Zero);
-        }
-        if (value & 4) != 0 {
-            ret.insert(StatusFlags::IRQDisable);
-        }
-        if (value & 8) != 0 {
-            ret.insert(StatusFlags::Decimal);
-        }
-        if (value & 16) != 0 {
-            ret.insert(StatusFlags::BRK);
-        }
-        if (value & 64) != 0 {
-            ret.insert(StatusFlags::Overflow);
-        }
-        if (value & 128) != 0 {
-            ret.insert(StatusFlags::Negative);
-        }
-        ret
+    fn is_set(&self, flag: StatusFlag) -> bool {
+        let flag: u8 = flag.into();
+        self.0 & flag != 0
     }
-    fn to_u8(flags: HashSet<Self>) -> u8 {
-        let mut ret: u8 = 0;
-        for flag in flags {
-            let flag: u8 = flag.into();
-            ret = ret | flag;
-        }
-        ret
+    fn is_clear(&self, flag: StatusFlag) -> bool {
+        let flag: u8 = flag.into();
+        self.0 & flag == 0
     }
 }
 
-struct ProcessorStatus {
-    flags: u8,
-}
+struct Cycle(u8);
 
-impl ProcessorStatus {
-    fn from_flags(flags: HashSet<StatusFlags>) -> ProcessorStatus {
-        let mut ret: u8 = 0;
-        for flag in flags {
-            let flag: u8 = flag.into();
-            ret = ret | flag
-        }
-        ProcessorStatus { flags: ret }
-    }
-    fn is_set(&self, flag: StatusFlags) -> bool {
-        let flag: u8 = flag.into();
-        self.flags & flag != 0
-    }
-    fn is_clear(&self, flag: StatusFlags) -> bool {
-        let flag: u8 = flag.into();
-        self.flags & flag == 0
+impl Cycle {
+    fn plus(&self, n: u8) -> Cycle {
+        Cycle(self.0 + n)
     }
 }
 
@@ -627,66 +590,71 @@ fn instruction_and_mode(opcode: u8) -> (Instruction, AddrMode) {
 impl CPU {
     pub fn new() -> Self {
         let mem: [u8; 65536] = [0; 65536];
-        let st = ProcessorStatus { flags: 0 };
         CPU {
             a: 0,
             x: 0,
             y: 0,
-            st,
+            st: StatusFlags(0),
             pc: 0,
             sp: 0xff,
-            cycle: 0,
+            cycle: Cycle(0),
             mem,
             irq: false,
             irq_prev: false,
             nmi: false,
             nmi_prev: false,
             reset: false,
+            tmp: [0, 0],
         }
     }
-    pub fn load_memory_byte(&self, addr: u16) -> u8 {
+    fn _load_memory_byte_lo(&mut self, addr: u16) {
         // TODO: insert code for peripherals
         let addr: usize = addr.into();
-        self.mem[addr]
+        self.tmp[0] = self.mem[addr];
     }
-    pub fn store_memory_byte(&mut self, addr: u16, byte: u8) {
+    fn load_memory_byte_lo(&mut self, addr: u16) -> Cycle {
+        self._load_memory_byte_lo(addr);
+        self.cycle.plus(1)
+    }
+    fn _load_memory_byte_hi(&mut self, addr: u16) {
+        // TODO: insert code for peripherals
+        let addr: usize = addr.into();
+        self.tmp[1] = self.mem[addr];
+    }
+    fn load_memory_byte_hi(&mut self, addr: u16) -> Cycle {
+        self._load_memory_byte_hi(addr);
+        self.cycle.plus(1)
+    }
+    fn _store_memory_byte(&mut self, addr: u16, byte: u8) {
         let addr: usize = addr.into();
         self.mem[addr] = byte;
     }
-    pub fn store_memory_word(&mut self, addr: u16, word: u16) {
-        dbg!(addr, word);
-        let bytes = u16::to_le_bytes(word);
-        self.store_memory_byte(addr, bytes[0]);
-        self.store_memory_byte(addr + 1, bytes[1]);
-    }
-    pub fn load_memory_word(&self, addr: u16) -> u16 {
-        u16::from_le_bytes([self.load_memory_byte(addr), self.load_memory_byte(addr + 1)])
-    }
     pub fn reset(&mut self) {
-        self.pc = self.load_memory_word(0xfffc);
-        self.st.flags = 0;
+        self._load_memory_byte_lo(0xfffc);
+        self._load_memory_byte_hi(0xfffd);
+        self.pc = u16::from_le_bytes(self.tmp);
+        self.st = StatusFlags(0);
         self.irq = false;
         self.nmi = false;
-        self.cycle = 6;
+        self.cycle = Cycle(0);
         self.reset = true;
     }
-    fn stack_push_byte(&mut self, byte: u8) {
+    fn _stack_push_byte(&mut self, byte: u8) {
         let stack_base: u16 = 0x100;
         let addr: u16 = self.sp.into();
         let addr = stack_base + addr;
-        self.store_memory_byte(addr, byte);
+        self._store_memory_byte(addr, byte);
         if self.sp == 0 {
             self.sp = 0xff;
         } else {
             self.sp = self.sp - 1;
         }
     }
-    fn stack_push_word(&mut self, word: u16) {
-        let bytes = u16::to_le_bytes(word);
-        self.stack_push_byte(bytes[1]);
-        self.stack_push_byte(bytes[0]);
+    fn stack_push_byte(&mut self, byte: u8) -> Cycle {
+        self._stack_push_byte(byte);
+        self.cycle.plus(1)
     }
-    fn stack_pull_byte(&mut self) -> u8 {
+    fn _stack_pull_byte(&mut self, hi: bool) {
         if self.sp == 0xff {
             self.sp = 0x00;
         } else {
@@ -695,11 +663,19 @@ impl CPU {
         let stack_base: u16 = 0x100;
         let addr: u16 = self.sp.into();
         let addr = stack_base + addr;
-        self.load_memory_byte(addr)
+        if hi {
+            self._load_memory_byte_hi(addr);
+        } else {
+            self._load_memory_byte_lo(addr);
+        }
     }
-    fn stack_pull_word(&mut self) -> u16 {
-        let bytes = [self.stack_pull_byte(), self.stack_pull_byte()];
-        u16::from_le_bytes(bytes)
+    fn stack_pull_byte_lo(&mut self) -> Cycle {
+        self._stack_pull_byte(false);
+        self.cycle.plus(1)
+    }
+    fn stack_pull_byte_hi(&mut self) -> Cycle {
+        self._stack_pull_byte(true);
+        self.cycle.plus(1)
     }
     fn addr_add(addr: u16, val: u8) -> u16 {
         let ret: u32 = addr.into();
@@ -711,295 +687,348 @@ impl CPU {
         let ret: u16 = u16::try_from(ret).unwrap();
         ret
     }
-    pub fn cycle(&self) -> u8 {
-        self.cycle
+    fn set_flag(&mut self, flag: StatusFlag) {
+        let flag: u8 = flag.into();
+        self.st.0 = self.st.0 | flag;
     }
-    pub fn flags(&self) -> u8 {
-        self.st.flags
+    fn set_flags(&mut self, flags: &[StatusFlag]) {
+        for flag in flags {
+            self.set_flag(*flag);
+        }
     }
-    pub fn pc(&self) -> u16 {
-        self.pc
+    fn clear_flag(&mut self, flag: StatusFlag) {
+        let flag: u8 = flag.into();
+        self.st.0 = self.st.0 & !flag;
+    }
+    fn clear_flags(&mut self, flags: &[StatusFlag]) {
+        for flag in flags {
+            self.clear_flag(*flag);
+        }
+    }
+    fn set_pc(&mut self) -> Cycle {
+        let pc: u16 = u16::from_le_bytes(self.tmp);
+        self.pc = pc;
+        Cycle(0)
+    }
+    fn inc_pc(&mut self, arg: u8) -> Cycle {
+        let arg_signed: i8 = arg.cast_signed();
+        if arg_signed < 0 {
+            let arg: i16 = arg_signed.into();
+            let arg: i16 = arg.abs();
+            let arg: u16 = arg.cast_unsigned();
+            self.pc = self.pc - arg;
+        } else {
+            let arg: u16 = arg.into();
+            self.pc = self.pc + arg;
+        }
+        Cycle(0)
+    }
+    fn stack_push_pc_lo(&mut self, increment: u8) -> Cycle {
+        let pc = Self::addr_add(self.pc, increment);
+        let lo: u8 = (pc & 0xff).try_into().unwrap();
+        self.stack_push_byte(lo)
+    }
+    fn stack_push_pc_hi(&mut self, increment: u8) -> Cycle {
+        let pc = Self::addr_add(self.pc, increment);
+        let hi: u8 = (pc >> 8).try_into().unwrap();
+        self.stack_push_byte(hi)
+    }
+    fn stack_push_flags(&mut self) -> Cycle {
+        self.stack_push_byte(self.st.0)
+    }
+    fn stack_pull_flags(&mut self) -> Cycle {
+        self.stack_pull_byte_lo();
+        self.st.0 = self.tmp[0];
+        self.cycle.plus(1)
+    }
+    fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) -> Cycle {
+        self.set_flags(enable);
+        self.clear_flags(disable);
+        self.cycle.plus(1)
     }
     pub fn step(&mut self) {
-        let opcode = self.load_memory_byte(self.pc);
-        println!("{}: 0b{:08b} 0x{:04x} 0x{:02x}", self.cycle, self.st.flags, self.pc, opcode);
         if self.reset {
-            match self.cycle {
-                0 => self.reset = false,
+            match self.cycle.0 {
+                7 => {
+                    self.reset = false;
+                    self.cycle.0 = 0;
+                }
                 _ => {
-                    self.cycle = self.cycle - 1;
+                    self.cycle = self.cycle.plus(1);
+                    println!("(Reset)");
                     return;
                 }
             }
         }
-        match instruction_and_mode(opcode) {
-            (Instruction::BRK, AddrMode::Stack) => {
-                if self.st.is_set(StatusFlags::BRK) {
-                    match self.cycle {
-                        0 => {
-                            self.cycle = 2;
-                        }
-                        1 => {
-                            self.pc = self.pc + 2;
-                            self.cycle = 0;
-                        }
-                        _ => self.cycle = self.cycle - 1,
-                    }
-                } else {
-                    match self.cycle {
-                        0 => {
-                            self.stack_push_word(Self::addr_add(self.pc, 2));
-                            self.cycle = 6;
-                        }
-                        4 => {
-                            let push_flags = self.st.flags;
-                            self.stack_push_byte(push_flags);
-                            self.cycle = 3;
-                        }
-                        1 => {
-                            let brk_flag: u8 = StatusFlags::BRK.into();
-                            let i_flag: u8 = StatusFlags::IRQDisable.into();
-                            let d_flag: u8 = StatusFlags::Decimal.into();
-                            self.st.flags = self.st.flags | brk_flag | i_flag;
-                            self.st.flags = self.st.flags & !d_flag;
-                            let jump_to = self.load_memory_word(0xfffe);
-                            self.pc = jump_to;
-                            self.cycle = 0;
-                        }
-                        _ => self.cycle = self.cycle - 1,
-                    }
-                }
+        let opcode = self.mem[usize::from(self.pc)];
+        println!(
+            "{}: 0b{:08b} 0x{:04x} 0x{:02x}",
+            self.cycle.0, self.st.0, self.pc, opcode
+        );
+        let (inst, mode) = instruction_and_mode(opcode);
+        self.cycle = match (inst, mode, self.cycle.0) {
+            // all instructions require at least two cycles
+            (_, _, 0) => Cycle(1),
+            (_, _, 1) => Cycle(2),
+
+            (Instruction::BRK, AddrMode::Stack, 2) if self.st.is_set(StatusFlag::BRK) => Cycle(3),
+            (Instruction::BRK, AddrMode::Stack, 3) if self.st.is_set(StatusFlag::BRK) => {
+                self.inc_pc(2)
             }
-            (Instruction::ORA, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::TSB, AddrMode::ZeroPage) => {}
-            (Instruction::ORA, AddrMode::ZeroPage) => {}
-            (Instruction::ASL, AddrMode::ZeroPage) => {}
-            (Instruction::RMB0, AddrMode::ZeroPage) => {}
-            (Instruction::PHP, AddrMode::Stack) => {}
-            (Instruction::ORA, AddrMode::Immediate) => {}
-            (Instruction::ASL, AddrMode::Accumulator) => {}
-            (Instruction::TSB, AddrMode::Absolute) => {}
-            (Instruction::ORA, AddrMode::Absolute) => {}
-            (Instruction::ASL, AddrMode::Absolute) => {}
-            (Instruction::BBR0, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BPL, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::ORA, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::ORA, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::TRB, AddrMode::ZeroPage) => {}
-            (Instruction::ORA, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::ASL, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::RMB1, AddrMode::ZeroPage) => {}
-            (Instruction::CLC, AddrMode::Implied) => {}
-            (Instruction::ORA, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::INC, AddrMode::Accumulator) => {}
-            (Instruction::TRB, AddrMode::Absolute) => {}
-            (Instruction::ORA, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::ASL, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBR1, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::JSR, AddrMode::Absolute) => {}
-            (Instruction::AND, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::BIT, AddrMode::ZeroPage) => {}
-            (Instruction::AND, AddrMode::ZeroPage) => {}
-            (Instruction::ROL, AddrMode::ZeroPage) => {}
-            (Instruction::RMB2, AddrMode::ZeroPage) => {}
-            (Instruction::PLP, AddrMode::Stack) => {}
-            (Instruction::AND, AddrMode::Immediate) => {}
-            (Instruction::ROL, AddrMode::Accumulator) => {}
-            (Instruction::BIT, AddrMode::Absolute) => {}
-            (Instruction::AND, AddrMode::Absolute) => {}
-            (Instruction::ROL, AddrMode::Absolute) => {}
-            (Instruction::BBR2, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BMI, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::AND, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::AND, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::BIT, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::AND, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::ROL, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::RMB3, AddrMode::ZeroPage) => {}
-            (Instruction::SEC, AddrMode::Implied) => {}
-            (Instruction::AND, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::DEC, AddrMode::Accumulator) => {}
-            (Instruction::BIT, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::AND, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::ROL, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBR3, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::RTI, AddrMode::Stack) => {
-                let flags = self.stack_pull_byte();
-                let pc = self.stack_pull_word();
-                self.st.flags = flags;
-                self.pc = pc;
-                self.cycle = 0;
+            (Instruction::BRK, AddrMode::Stack, 2) => self.stack_push_pc_lo(2),
+            (Instruction::BRK, AddrMode::Stack, 3) => self.stack_push_pc_hi(2),
+            (Instruction::BRK, AddrMode::Stack, 4) => {
+                self.stack_push_flags();
+                self.change_flags( &[StatusFlag::BRK, StatusFlag::IRQDisable], &[StatusFlag::Decimal],)
             }
-            (Instruction::EOR, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::EOR, AddrMode::ZeroPage) => {}
-            (Instruction::LSR, AddrMode::ZeroPage) => {}
-            (Instruction::RMB4, AddrMode::ZeroPage) => {}
-            (Instruction::PHA, AddrMode::Stack) => {}
-            (Instruction::EOR, AddrMode::Immediate) => {}
-            (Instruction::LSR, AddrMode::Accumulator) => {}
-            (Instruction::JMP, AddrMode::Absolute) => {}
-            (Instruction::EOR, AddrMode::Absolute) => {}
-            (Instruction::LSR, AddrMode::Absolute) => {}
-            (Instruction::BBR4, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BVC, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::EOR, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::EOR, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::EOR, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::LSR, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::RMB5, AddrMode::ZeroPage) => {}
-            (Instruction::CLI, AddrMode::Implied) => {}
-            (Instruction::EOR, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::PHY, AddrMode::Stack) => {}
-            (Instruction::EOR, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::LSR, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBR5, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::RTS, AddrMode::Stack) => {}
-            (Instruction::ADC, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::STZ, AddrMode::ZeroPage) => {}
-            (Instruction::ADC, AddrMode::ZeroPage) => {}
-            (Instruction::ROR, AddrMode::ZeroPage) => {}
-            (Instruction::RMB6, AddrMode::ZeroPage) => {}
-            (Instruction::PLA, AddrMode::Stack) => {}
-            (Instruction::ADC, AddrMode::Immediate) => {}
-            (Instruction::ROR, AddrMode::Accumulator) => {}
-            (Instruction::JMP, AddrMode::AbsoluteIndirect) => {}
-            (Instruction::ADC, AddrMode::Absolute) => {}
-            (Instruction::ROR, AddrMode::Absolute) => {}
-            (Instruction::BBR6, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BVS, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::ADC, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::ADC, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::STZ, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::ADC, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::ROR, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::RMB7, AddrMode::ZeroPage) => {}
-            (Instruction::SEI, AddrMode::Implied) => {}
-            (Instruction::ADC, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::PLY, AddrMode::Stack) => {}
-            (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect) => {}
-            (Instruction::ADC, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::ROR, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBR7, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BRA, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::STA, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::STY, AddrMode::ZeroPage) => {}
-            (Instruction::STA, AddrMode::ZeroPage) => {}
-            (Instruction::STX, AddrMode::ZeroPage) => {}
-            (Instruction::SMB0, AddrMode::ZeroPage) => {}
-            (Instruction::DEY, AddrMode::Implied) => {}
-            (Instruction::BIT, AddrMode::Immediate) => {}
-            (Instruction::TXA, AddrMode::Implied) => {}
-            (Instruction::STY, AddrMode::Absolute) => {}
-            (Instruction::STA, AddrMode::Absolute) => {}
-            (Instruction::STX, AddrMode::Absolute) => {}
-            (Instruction::BBS0, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BCC, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::STA, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::STA, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::STY, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::STA, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::STX, AddrMode::ZeroPageIndexedWithY) => {}
-            (Instruction::SMB1, AddrMode::ZeroPage) => {}
-            (Instruction::TYA, AddrMode::Implied) => {}
-            (Instruction::STA, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::TXS, AddrMode::Implied) => {}
-            (Instruction::STZ, AddrMode::Absolute) => {}
-            (Instruction::STA, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::STZ, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBS1, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::LDY, AddrMode::Immediate) => {}
-            (Instruction::LDA, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::LDX, AddrMode::Immediate) => {}
-            (Instruction::LDY, AddrMode::ZeroPage) => {}
-            (Instruction::LDA, AddrMode::ZeroPage) => {}
-            (Instruction::LDX, AddrMode::ZeroPage) => {}
-            (Instruction::SMB2, AddrMode::ZeroPage) => {}
-            (Instruction::TAY, AddrMode::Implied) => {}
-            (Instruction::LDA, AddrMode::Immediate) => {}
-            (Instruction::TAX, AddrMode::Implied) => {}
-            (Instruction::LDY, AddrMode::Accumulator) => {}
-            (Instruction::LDA, AddrMode::Absolute) => {}
-            (Instruction::LDX, AddrMode::Absolute) => {}
-            (Instruction::BBS2, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BCS, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::LDA, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::LDA, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::LDY, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::LDA, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::LDX, AddrMode::ZeroPageIndexedWithY) => {}
-            (Instruction::SMB3, AddrMode::ZeroPage) => {}
-            (Instruction::CLV, AddrMode::Implied) => {}
-            (Instruction::LDA, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::TSX, AddrMode::Implied) => {}
-            (Instruction::LDY, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::LDA, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::LDX, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::BBS3, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::CPY, AddrMode::Immediate) => {}
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::CPY, AddrMode::ZeroPage) => {}
-            (Instruction::CMP, AddrMode::ZeroPage) => {}
-            (Instruction::DEC, AddrMode::ZeroPage) => {}
-            (Instruction::SMB4, AddrMode::ZeroPage) => {}
-            (Instruction::INY, AddrMode::Implied) => {}
-            (Instruction::CMP, AddrMode::Immediate) => {}
-            (Instruction::DEX, AddrMode::Implied) => {}
-            (Instruction::WAI, AddrMode::Implied) => {}
-            (Instruction::CPY, AddrMode::Absolute) => {}
-            (Instruction::CMP, AddrMode::Absolute) => {}
-            (Instruction::DEC, AddrMode::Absolute) => {}
-            (Instruction::BBS4, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BNE, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::CMP, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::CMP, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::CMP, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::DEC, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::SMB5, AddrMode::ZeroPage) => {}
-            (Instruction::CLD, AddrMode::Implied) => {}
-            (Instruction::CMP, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::PHX, AddrMode::Stack) => {}
-            (Instruction::STP, AddrMode::Implied) => {}
-            (Instruction::CMP, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::DEC, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBS5, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::CPX, AddrMode::Immediate) => {}
-            (Instruction::SBC, AddrMode::ZeroPageIndexedIndirect) => {}
-            (Instruction::CPX, AddrMode::ZeroPage) => {}
-            (Instruction::SBC, AddrMode::ZeroPage) => {}
-            (Instruction::INC, AddrMode::ZeroPage) => {}
-            (Instruction::SMB6, AddrMode::ZeroPage) => {}
-            (Instruction::INX, AddrMode::Implied) => {}
-            (Instruction::SBC, AddrMode::Immediate) => {}
-            (Instruction::NOP, AddrMode::Implied) => {}
-            (Instruction::CPX, AddrMode::Absolute) => {}
-            (Instruction::SBC, AddrMode::Absolute) => {}
-            (Instruction::INC, AddrMode::Absolute) => {}
-            (Instruction::BBS6, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::BEQ, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::SBC, AddrMode::ZeroPageIndirectIndexedWithY) => {}
-            (Instruction::SBC, AddrMode::ZeroPageIndirect) => {}
-            (Instruction::SBC, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::INC, AddrMode::ZeroPageIndexedWithX) => {}
-            (Instruction::SMB7, AddrMode::ZeroPage) => {}
-            (Instruction::SED, AddrMode::Implied) => {}
-            (Instruction::SBC, AddrMode::AbsoluteIndexedWithY) => {}
-            (Instruction::PLX, AddrMode::Stack) => {}
-            (Instruction::SBC, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::INC, AddrMode::AbsoluteIndexedWithX) => {}
-            (Instruction::BBS7, AddrMode::ProgramCounterRelative) => {}
-            (Instruction::ILL, _) => panic!("Illegal opcode {opcode}"),
-            (instruction, addr_mode) => panic!(
+            (Instruction::BRK, AddrMode::Stack, 5) => self.load_memory_byte_lo(0xfffe),
+            (Instruction::BRK, AddrMode::Stack, 6) => {
+                self.load_memory_byte_hi(0xffff);
+                self.set_pc()
+            }
+
+            (Instruction::ORA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::TSB, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::RMB0, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::PHP, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::TSB, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBR0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BPL, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::TRB, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::RMB1, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::CLC, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::INC, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::TRB, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBR1, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::JSR, AddrMode::Absolute, 2) => self.stack_push_pc_hi(3),
+            (Instruction::JSR, AddrMode::Absolute, 3) => self.stack_push_pc_lo(3),
+            (Instruction::JSR, AddrMode::Absolute, 4) => {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::JSR, AddrMode::Absolute, 5) => {
+                self.load_memory_byte_hi(Self::addr_add(self.pc, 2))
+            }
+            (Instruction::JSR, AddrMode::Absolute, 6) => self.set_pc(),
+
+            (Instruction::AND, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::BIT, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::AND, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ROL, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::RMB2, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::PLP, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::AND, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::ROL, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::BIT, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::AND, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::ROL, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBR2, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BMI, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::AND, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::AND, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::BIT, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::AND, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::ROL, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::RMB3, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SEC, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::AND, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::BIT, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::AND, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::ROL, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBR3, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::RTI, AddrMode::Stack, 2) => self.stack_pull_flags(),
+            (Instruction::RTI, AddrMode::Stack, 3) => self.stack_pull_byte_lo(),
+            (Instruction::RTI, AddrMode::Stack, 4) => self.stack_pull_byte_lo(),
+            (Instruction::RTI, AddrMode::Stack, 5) => self.stack_pull_byte_hi(),
+            (Instruction::RTI, AddrMode::Stack, 6) => self.set_pc(),
+
+            (Instruction::EOR, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::LSR, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::RMB4, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::PHA, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::LSR, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::JMP, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::LSR, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBR4, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BVC, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::LSR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::RMB5, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::CLI, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::PHY, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::EOR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::LSR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBR5, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::RTS, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
+            (Instruction::RTS, AddrMode::Stack, 3) => self.stack_pull_byte_hi(),
+            (Instruction::RTS, AddrMode::Stack, 4) => self.set_pc(),
+
+            (Instruction::ADC, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::STZ, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ROR, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::RMB6, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::PLA, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::ROR, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::JMP, AddrMode::AbsoluteIndirect, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::ROR, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBR6, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BVS, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::STZ, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::ROR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::RMB7, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SEI, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::PLY, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect, _) => Cycle(0),
+            (Instruction::ADC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::ROR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBR7, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BRA, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::STA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::STY, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::STA, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::STX, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SMB0, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::DEY, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::BIT, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::TXA, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::STY, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::STA, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::STX, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBS0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BCC, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::STA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::STA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::STY, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::STA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::STX, AddrMode::ZeroPageIndexedWithY, _) => Cycle(0),
+            (Instruction::SMB1, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::TYA, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::STA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::TXS, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::STZ, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::STA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::STZ, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBS1, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::LDY, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::LDX, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::LDY, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::LDX, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SMB2, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::TAY, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::TAX, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::LDY, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::LDX, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBS2, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BCS, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::LDY, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::LDX, AddrMode::ZeroPageIndexedWithY, _) => Cycle(0),
+            (Instruction::SMB3, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::CLV, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::TSX, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::LDY, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::LDA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::LDX, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::BBS3, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::CPY, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::CPY, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SMB4, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::INY, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::DEX, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::WAI, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::CPY, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBS4, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::BNE, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::SMB5, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::CLD, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::PHX, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::STP, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::CMP, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBS5, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::CPX, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
+            (Instruction::CPX, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::INC, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SMB6, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::INX, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::Immediate, _) => Cycle(0),
+            (Instruction::NOP, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::CPX, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::INC, AddrMode::Absolute, _) => Cycle(0),
+            (Instruction::BBS6, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 2) if self.st.is_set(StatusFlag::Zero) =>
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
+            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 3) if self.st.is_set(StatusFlag::Zero) =>
+                self.inc_pc(self.tmp[0]),
+            (Instruction::BEQ, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
+            (Instruction::SBC, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::ZeroPageIndirect, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::INC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
+            (Instruction::SMB7, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::SED, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
+            (Instruction::PLX, AddrMode::Stack, _) => Cycle(0),
+            (Instruction::SBC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::INC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
+            (Instruction::BBS7, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+            (Instruction::ILL, _, _) => panic!("Illegal opcode {opcode}"),
+            (instruction, addr_mode, _) => panic!(
                 "Shouldn't happen: {:?} with addressing mode {:?}",
                 instruction, addr_mode
             ),
         }
     }
-}
-
-mod test {
-    use crate::cpu6502::CPU;
-    use std::io::Read;
-
-    #[test]
-    fn test_brk() {}
 }
