@@ -751,7 +751,7 @@ impl CPU {
         self.clear_flags(disable);
         self.cycle.plus(1)
     }
-    fn load_zp_arg(&mut self) -> Cycle {
+    fn load_byte_arg(&mut self) -> Cycle {
         let addr: u16 = Self::addr_add(self.pc, 1);
         self.tmp[1] = 0;
         self.load_memory_byte_lo(addr)
@@ -765,6 +765,22 @@ impl CPU {
         let ret = self.load_memory_byte_hi(self.tmp_addr);
         self.tmp_addr = u16::from_le_bytes(self.tmp);
         ret
+    }
+    fn compare_and_set_flags(&mut self, byte: u8) {
+        match self.a.cmp(&byte) {
+            std::cmp::Ordering::Less => self.change_flags(
+                &[StatusFlag::Negative],
+                &[StatusFlag::Carry, StatusFlag::Zero],
+            ),
+            std::cmp::Ordering::Equal => self.change_flags(
+                &[StatusFlag::Zero, StatusFlag::Carry],
+                &[StatusFlag::Negative],
+            ),
+            std::cmp::Ordering::Greater => self.change_flags(
+                &[StatusFlag::Carry],
+                &[StatusFlag::Zero, StatusFlag::Negative],
+            ),
+        };
     }
     pub fn step(&mut self) {
         if self.reset {
@@ -994,34 +1010,21 @@ impl CPU {
             (Instruction::BBS3, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::CPY, AddrMode::Immediate, _) => Cycle(0),
 
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_zp_arg(),
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_byte_arg(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 3) => self.load_indexed_x_lo(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 4) => self.load_indexed_x_hi(),
             (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 5) => self.load_memory_byte_lo(self.tmp_addr),
-            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 6) => {
-                match self.a.cmp(&self.tmp[0]) {
-                    std::cmp::Ordering::Less => self.change_flags(
-                        &[StatusFlag::Negative],
-                        &[StatusFlag::Carry, StatusFlag::Zero],
-                    ),
-                    std::cmp::Ordering::Equal => self.change_flags(
-                        &[StatusFlag::Zero, StatusFlag::Carry],
-                        &[StatusFlag::Negative],
-                    ),
-                    std::cmp::Ordering::Greater => self.change_flags(
-                        &[StatusFlag::Carry],
-                        &[StatusFlag::Zero, StatusFlag::Negative],
-                    ),
-                };
-                self.inc_pc(2)
-            }
+            (Instruction::CMP, AddrMode::ZeroPageIndexedIndirect, 6) => { self.compare_and_set_flags(self.tmp[0]); self.inc_pc(2) }
 
             (Instruction::CPY, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::CMP, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::DEC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB4, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::INY, AddrMode::Implied, _) => Cycle(0),
-            (Instruction::CMP, AddrMode::Immediate, _) => Cycle(0),
+            
+            (Instruction::CMP, AddrMode::Immediate, 2) => self.load_byte_arg(),
+            (Instruction::CMP, AddrMode::Immediate, 3) => { self.compare_and_set_flags(self.tmp[0]); self.inc_pc(2) }
+
             (Instruction::DEX, AddrMode::Implied, _) => Cycle(0),
             (Instruction::WAI, AddrMode::Implied, _) => Cycle(0),
             (Instruction::CPY, AddrMode::Absolute, _) => Cycle(0),
