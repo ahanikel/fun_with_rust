@@ -832,7 +832,18 @@ impl CPU {
             (Instruction::ASL, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::RMB0, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::PHP, AddrMode::Stack, _) => Cycle(0),
-            (Instruction::ORA, AddrMode::Immediate, _) => Cycle(0),
+
+            (Instruction::ORA, AddrMode::Immediate, 2) => {
+                self.load_byte_arg();
+                self.a = self.a | self.tmp[0];
+                if self.a == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.a >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::ASL, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::TSB, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::ORA, AddrMode::Absolute, _) => Cycle(0),
@@ -869,7 +880,18 @@ impl CPU {
             (Instruction::ROL, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::RMB2, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::PLP, AddrMode::Stack, _) => Cycle(0),
-            (Instruction::AND, AddrMode::Immediate, _) => Cycle(0),
+
+            (Instruction::AND, AddrMode::Immediate, 2) => {
+                self.load_byte_arg();
+                self.a = self.a & self.tmp[0];
+                if self.a == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.a >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::ROL, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::BIT, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::AND, AddrMode::Absolute, _) => Cycle(0),
