@@ -962,7 +962,18 @@ impl CPU {
             (Instruction::ADC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::ROR, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::RMB6, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::PLA, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PLA, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
+            (Instruction::PLA, AddrMode::Stack, 3) => {
+                self.a = self.tmp[0];
+                if self.a == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.a >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::ADC, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::ROR, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::JMP, AddrMode::AbsoluteIndirect, _) => Cycle(0),
@@ -978,7 +989,18 @@ impl CPU {
             (Instruction::RMB7, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SEI, AddrMode::Implied, _) => Cycle(0),
             (Instruction::ADC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
-            (Instruction::PLY, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PLY, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
+            (Instruction::PLY, AddrMode::Stack, 3) => {
+                self.y = self.tmp[0];
+                if self.y == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.y >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect, _) => Cycle(0),
             (Instruction::ADC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::ROR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -1176,7 +1198,18 @@ impl CPU {
             (Instruction::SMB7, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SED, AddrMode::Implied, _) => Cycle(0),
             (Instruction::SBC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
-            (Instruction::PLX, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PLX, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
+            (Instruction::PLX, AddrMode::Stack, 3) => {
+                self.x = self.tmp[0];
+                if self.x == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else if self.x >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::SBC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::INC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::BBS7, AddrMode::ProgramCounterRelative, _) => Cycle(0),
