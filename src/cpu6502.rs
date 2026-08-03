@@ -935,7 +935,24 @@ impl CPU {
 
             (Instruction::AND, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
 
-            (Instruction::DEC, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::DEC, AddrMode::Accumulator, 2) => {
+                if self.a == 0 {
+                    self.a = 0xff;
+                } else {
+                    self.a = self.a - 1;
+                }
+                if self.a == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else {
+                    self.clear_flag(StatusFlag::Zero);
+                }
+                if self.a >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                } else {
+                    self.clear_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
 
             (Instruction::BIT, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::AND, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -1056,7 +1073,26 @@ impl CPU {
             (Instruction::STA, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::STX, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB0, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::DEY, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::DEY, AddrMode::Implied, 2) => {
+                if self.y == 0 {
+                    self.y = 0xff;
+                } else {
+                    self.y = self.a - 1;
+                }
+                if self.y == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else {
+                    self.clear_flag(StatusFlag::Zero);
+                }
+                if self.y >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                } else {
+                    self.clear_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::BIT, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::TXA, AddrMode::Implied, _) => Cycle(0),
 
@@ -1198,7 +1234,25 @@ impl CPU {
                 self.inc_pc(2)
             }
 
-            (Instruction::DEX, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::DEX, AddrMode::Implied, 2) => {
+                if self.x == 0 {
+                    self.x = 0xff;
+                } else {
+                    self.x = self.a - 1;
+                }
+                if self.x == 0 {
+                    self.set_flag(StatusFlag::Zero);
+                } else {
+                    self.clear_flag(StatusFlag::Zero);
+                }
+                if self.x >= 0x80 {
+                    self.set_flag(StatusFlag::Negative);
+                } else {
+                    self.clear_flag(StatusFlag::Negative);
+                }
+                self.inc_pc(2)
+            }
+
             (Instruction::WAI, AddrMode::Implied, _) => Cycle(0),
             (Instruction::CPY, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::CMP, AddrMode::Absolute, _) => Cycle(0),
