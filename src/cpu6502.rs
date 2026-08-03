@@ -979,7 +979,19 @@ impl CPU {
             (Instruction::EOR, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::LSR, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBR4, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BVC, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BVC, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_clear(StatusFlag::Overflow) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BVC, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_clear(StatusFlag::Overflow) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
+            (Instruction::BVC, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
             (Instruction::EOR, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::EOR, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::EOR, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
@@ -1032,7 +1044,19 @@ impl CPU {
             (Instruction::ADC, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::ROR, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBR6, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BVS, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BVS, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_set(StatusFlag::Overflow) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BVS, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_set(StatusFlag::Overflow) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
+            (Instruction::BVS, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
             (Instruction::ADC, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::ADC, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::STZ, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
@@ -1067,7 +1091,14 @@ impl CPU {
             (Instruction::ADC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::ROR, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::BBR7, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BRA, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BRA, AddrMode::ProgramCounterRelative, 2) => {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BRA, AddrMode::ProgramCounterRelative, 3) => {
+                self.inc_pc(self.tmp[0])
+            }
+
             (Instruction::STA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
             (Instruction::STY, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::STA, AddrMode::ZeroPage, _) => Cycle(0),
@@ -1118,7 +1149,20 @@ impl CPU {
             }
 
             (Instruction::BBS0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BCC, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BCC, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_clear(StatusFlag::Carry) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BCC, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_clear(StatusFlag::Carry) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
+            (Instruction::BCC, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
+
             (Instruction::STA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::STA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::STY, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
@@ -1258,7 +1302,19 @@ impl CPU {
             (Instruction::CMP, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::DEC, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBS4, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BNE, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BNE, AddrMode::ProgramCounterRelative, 2)
+                if self.st.is_clear(StatusFlag::Zero) =>
+            {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::BNE, AddrMode::ProgramCounterRelative, 3)
+                if self.st.is_clear(StatusFlag::Zero) =>
+            {
+                self.inc_pc(self.tmp[0])
+            }
+            (Instruction::BNE, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+
             (Instruction::CMP, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::CMP, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::CMP, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
