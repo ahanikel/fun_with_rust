@@ -790,6 +790,19 @@ impl CPU {
             ),
         };
     }
+    fn check_and_set_nz_flags(&mut self, byte: u8) {
+        if byte == 0 {
+            self.set_flag(StatusFlag::Zero);
+        } else {
+            self.clear_flag(StatusFlag::Zero);
+        }
+        if byte >= 0x80 {
+            self.set_flag(StatusFlag::Negative);
+        } else {
+            self.clear_flag(StatusFlag::Negative);
+        }
+    }
+
     pub fn step(&mut self) {
         if self.reset {
             match self.cycle.0 {
@@ -844,16 +857,7 @@ impl CPU {
             (Instruction::ORA, AddrMode::Immediate, 2) => {
                 self.load_byte_arg_lo();
                 self.a = self.a | self.tmp[0];
-                if self.a == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.a >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.a);
                 self.inc_pc(2)
             }
 
@@ -902,16 +906,7 @@ impl CPU {
             (Instruction::AND, AddrMode::Immediate, 2) => {
                 self.load_byte_arg_lo();
                 self.a = self.a & self.tmp[0];
-                if self.a == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.a >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.a);
                 self.inc_pc(2)
             }
 
@@ -941,16 +936,7 @@ impl CPU {
                 } else {
                     self.a = self.a - 1;
                 }
-                if self.a == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.a >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.a);
                 self.inc_pc(2)
             }
 
@@ -1025,16 +1011,7 @@ impl CPU {
             (Instruction::PLA, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
             (Instruction::PLA, AddrMode::Stack, 3) => {
                 self.a = self.tmp[0];
-                if self.a == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.a >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.a);
                 self.inc_pc(2)
             }
 
@@ -1074,16 +1051,7 @@ impl CPU {
             (Instruction::PLY, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
             (Instruction::PLY, AddrMode::Stack, 3) => {
                 self.y = self.tmp[0];
-                if self.y == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.y >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.y);
                 self.inc_pc(2)
             }
 
@@ -1095,9 +1063,7 @@ impl CPU {
             (Instruction::BRA, AddrMode::ProgramCounterRelative, 2) => {
                 self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
             }
-            (Instruction::BRA, AddrMode::ProgramCounterRelative, 3) => {
-                self.inc_pc(self.tmp[0])
-            }
+            (Instruction::BRA, AddrMode::ProgramCounterRelative, 3) => self.inc_pc(self.tmp[0]),
 
             (Instruction::STA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
             (Instruction::STY, AddrMode::ZeroPage, _) => Cycle(0),
@@ -1109,18 +1075,9 @@ impl CPU {
                 if self.y == 0 {
                     self.y = 0xff;
                 } else {
-                    self.y = self.a - 1;
+                    self.y = self.y - 1;
                 }
-                if self.y == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.y >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.y);
                 self.inc_pc(2)
             }
 
@@ -1162,7 +1119,6 @@ impl CPU {
             }
             (Instruction::BCC, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
 
-
             (Instruction::STA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::STA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::STY, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
@@ -1188,41 +1144,31 @@ impl CPU {
             (Instruction::TAX, AddrMode::Implied, _) => Cycle(0),
             (Instruction::LDY, AddrMode::Accumulator, _) => Cycle(0),
 
-            (Instruction::LDA, AddrMode::Absolute, 2) => self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
-            (Instruction::LDA, AddrMode::Absolute, 3) => self.load_memory_byte_hi(Self::addr_add(self.pc, 2)),
+            (Instruction::LDA, AddrMode::Absolute, 2) => {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::LDA, AddrMode::Absolute, 3) => {
+                self.load_memory_byte_hi(Self::addr_add(self.pc, 2))
+            }
             (Instruction::LDA, AddrMode::Absolute, 4) => {
                 self.tmp_addr = u16::from_le_bytes(self.tmp);
                 self.load_memory_byte_lo(self.tmp_addr);
                 self.a = self.tmp[0];
-                if self.a == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.a >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.a);
                 self.inc_pc(3)
             }
 
-            (Instruction::LDX, AddrMode::Absolute, 2) => self.load_memory_byte_lo(Self::addr_add(self.pc, 1)),
-            (Instruction::LDX, AddrMode::Absolute, 3) => self.load_memory_byte_hi(Self::addr_add(self.pc, 2)),
+            (Instruction::LDX, AddrMode::Absolute, 2) => {
+                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
+            }
+            (Instruction::LDX, AddrMode::Absolute, 3) => {
+                self.load_memory_byte_hi(Self::addr_add(self.pc, 2))
+            }
             (Instruction::LDX, AddrMode::Absolute, 4) => {
                 self.tmp_addr = u16::from_le_bytes(self.tmp);
                 self.load_memory_byte_lo(self.tmp_addr);
                 self.x = self.tmp[0];
-                if self.x == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.x >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.x);
                 self.inc_pc(3)
             }
 
@@ -1282,18 +1228,9 @@ impl CPU {
                 if self.x == 0 {
                     self.x = 0xff;
                 } else {
-                    self.x = self.a - 1;
+                    self.x = self.x - 1;
                 }
-                if self.x == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.x >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.x);
                 self.inc_pc(2)
             }
 
@@ -1367,16 +1304,7 @@ impl CPU {
             (Instruction::PLX, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
             (Instruction::PLX, AddrMode::Stack, 3) => {
                 self.x = self.tmp[0];
-                if self.x == 0 {
-                    self.set_flag(StatusFlag::Zero);
-                } else {
-                    self.clear_flag(StatusFlag::Zero);
-                }
-                if self.x >= 0x80 {
-                    self.set_flag(StatusFlag::Negative);
-                } else {
-                    self.clear_flag(StatusFlag::Negative);
-                }
+                self.check_and_set_nz_flags(self.x);
                 self.inc_pc(2)
             }
 
