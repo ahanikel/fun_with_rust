@@ -1078,11 +1078,15 @@ impl CPU {
                     self.y = self.y - 1;
                 }
                 self.check_and_set_nz_flags(self.y);
-                self.inc_pc(2)
+                self.inc_pc(1)
             }
 
             (Instruction::BIT, AddrMode::Immediate, _) => Cycle(0),
-            (Instruction::TXA, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::TXA, AddrMode::Implied, 2) => {
+                self.a = self.x;
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(1)
+            }
 
             (Instruction::STY, AddrMode::Absolute, 2) => self.load_byte_arg_lo(),
             (Instruction::STY, AddrMode::Absolute, 3) => self.load_byte_arg_hi(),
@@ -1125,9 +1129,20 @@ impl CPU {
             (Instruction::STA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::STX, AddrMode::ZeroPageIndexedWithY, _) => Cycle(0),
             (Instruction::SMB1, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::TYA, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::TYA, AddrMode::Implied, 2) => {
+                self.a = self.y;
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(1)
+            }
+
             (Instruction::STA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
-            (Instruction::TXS, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::TXS, AddrMode::Implied, 2) => {
+                self.sp = self.x;
+                self.inc_pc(1)
+            }
+
             (Instruction::STZ, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::STA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::STZ, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
@@ -1139,9 +1154,21 @@ impl CPU {
             (Instruction::LDA, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::LDX, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB2, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::TAY, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::TAY, AddrMode::Implied, 2) => {
+                self.y = self.a;
+                self.check_and_set_nz_flags(self.y);
+                self.inc_pc(1)
+            }
+
             (Instruction::LDA, AddrMode::Immediate, _) => Cycle(0),
-            (Instruction::TAX, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::TAX, AddrMode::Implied, 2) => {
+                self.x = self.a;
+                self.check_and_set_nz_flags(self.x);
+                self.inc_pc(1)
+            }
+
             (Instruction::LDY, AddrMode::Accumulator, _) => Cycle(0),
 
             (Instruction::LDA, AddrMode::Absolute, 2) => {
@@ -1192,9 +1219,20 @@ impl CPU {
             (Instruction::LDA, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::LDX, AddrMode::ZeroPageIndexedWithY, _) => Cycle(0),
             (Instruction::SMB3, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::CLV, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::CLV, AddrMode::Implied, 2) => {
+                self.clear_flag(StatusFlag::Overflow);
+                self.inc_pc(1)
+            }
+
             (Instruction::LDA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
-            (Instruction::TSX, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::TSX, AddrMode::Implied, 2) => {
+                self.x = self.sp;
+                self.check_and_set_nz_flags(self.x);
+                self.inc_pc(1)
+            }
+
             (Instruction::LDY, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::LDA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::LDX, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
@@ -1216,7 +1254,16 @@ impl CPU {
             (Instruction::CMP, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::DEC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB4, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::INY, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::INY, AddrMode::Implied, 2) => {
+                if self.y == 0xff {
+                    self.y = 0;
+                } else {
+                    self.y = self.y + 1;
+                }
+                self.check_and_set_nz_flags(self.y);
+                self.inc_pc(1)
+            }
 
             (Instruction::CMP, AddrMode::Immediate, 2) => self.load_byte_arg_lo(),
             (Instruction::CMP, AddrMode::Immediate, 3) => {
@@ -1234,7 +1281,8 @@ impl CPU {
                 self.inc_pc(2)
             }
 
-            (Instruction::WAI, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::WAI, AddrMode::Implied, 2) => Cycle(0), // busy waiting for now
+
             (Instruction::CPY, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::CMP, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::DEC, AddrMode::Absolute, _) => Cycle(0),
@@ -1257,13 +1305,19 @@ impl CPU {
             (Instruction::CMP, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::DEC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::SMB5, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::CLD, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::CLD, AddrMode::Implied, 2) => {
+                self.clear_flag(StatusFlag::Decimal);
+                self.inc_pc(1)
+            }
+
             (Instruction::CMP, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
 
             (Instruction::PHX, AddrMode::Stack, 2) => self.stack_push_byte(self.x),
             (Instruction::PHX, AddrMode::Stack, 3) => self.inc_pc(1),
 
-            (Instruction::STP, AddrMode::Implied, _) => Cycle(0),
+            (Instruction::STP, AddrMode::Implied, 2) => Cycle(0), // busy waiting for now
+
             (Instruction::CMP, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::DEC, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::BBS5, AddrMode::ProgramCounterRelative, _) => Cycle(0),
@@ -1273,9 +1327,23 @@ impl CPU {
             (Instruction::SBC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::INC, AddrMode::ZeroPage, _) => Cycle(0),
             (Instruction::SMB6, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::INX, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::INX, AddrMode::Implied, 2) => {
+                if self.x == 0xff {
+                    self.x = 0;
+                } else {
+                    self.x = self.x + 1;
+                }
+                self.check_and_set_nz_flags(self.x);
+                self.inc_pc(1)
+            }
+
             (Instruction::SBC, AddrMode::Immediate, _) => Cycle(0),
-            (Instruction::NOP, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::NOP, AddrMode::Implied, 2) => {
+                self.inc_pc(1)
+            }
+
             (Instruction::CPX, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::SBC, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::INC, AddrMode::Absolute, _) => Cycle(0),
@@ -1298,7 +1366,12 @@ impl CPU {
             (Instruction::SBC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::INC, AddrMode::ZeroPageIndexedWithX, _) => Cycle(0),
             (Instruction::SMB7, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::SED, AddrMode::Implied, _) => Cycle(0),
+
+            (Instruction::SED, AddrMode::Implied, 2) => {
+                self.set_flag(StatusFlag::Decimal);
+                self.inc_pc(1)
+            }
+
             (Instruction::SBC, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
 
             (Instruction::PLX, AddrMode::Stack, 2) => self.stack_pull_byte_lo(),
