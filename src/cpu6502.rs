@@ -80,6 +80,9 @@ impl Cycle {
     fn plus(&self, n: u8) -> Cycle {
         Cycle(self.0 + n)
     }
+    fn fplus(self, other: Cycle) -> Cycle {
+        Cycle(self.0 + other.0)
+    }
 }
 
 pub trait IsOriginal {
@@ -118,17 +121,106 @@ impl IsOriginal for AddrMode {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
-    ADC, AND, ASL, BBR0, BBR1, BBR2, BBR3, BBR4, BBR5, BBR6,
-    BBR7, BBS0, BBS1, BBS2, BBS3, BBS4, BBS5, BBS6, BBS7, BCC,
-    BCS, BEQ, BIT, BMI, BNE, BPL, BRA, BRK, BVC, BVS,
-    CLC, CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY,
-    EOR, INC, INX, INY, JMP, JSR, LDA, LDX, LDY, LSR,
-    NOP, ORA, PHA, PHP, PHX, PHY, PLA, PLP, PLX, PLY,
-    RMB0, RMB1, RMB2, RMB3, RMB4, RMB5, RMB6, RMB7, ROL, ROR,
-    RTI, RTS, SBC, SEC, SED, SEI, SMB0, SMB1, SMB2, SMB3,
-    SMB4, SMB5, SMB6, SMB7, STA, STP, STX, STY, STZ, TAX,
-    TAY, TRB, TSB, TSX, TXA, TXS, TYA, WAI, ILL,
- }
+    ADC,
+    AND,
+    ASL,
+    BBR0,
+    BBR1,
+    BBR2,
+    BBR3,
+    BBR4,
+    BBR5,
+    BBR6,
+    BBR7,
+    BBS0,
+    BBS1,
+    BBS2,
+    BBS3,
+    BBS4,
+    BBS5,
+    BBS6,
+    BBS7,
+    BCC,
+    BCS,
+    BEQ,
+    BIT,
+    BMI,
+    BNE,
+    BPL,
+    BRA,
+    BRK,
+    BVC,
+    BVS,
+    CLC,
+    CLD,
+    CLI,
+    CLV,
+    CMP,
+    CPX,
+    CPY,
+    DEC,
+    DEX,
+    DEY,
+    EOR,
+    INC,
+    INX,
+    INY,
+    JMP,
+    JSR,
+    LDA,
+    LDX,
+    LDY,
+    LSR,
+    NOP,
+    ORA,
+    PHA,
+    PHP,
+    PHX,
+    PHY,
+    PLA,
+    PLP,
+    PLX,
+    PLY,
+    RMB0,
+    RMB1,
+    RMB2,
+    RMB3,
+    RMB4,
+    RMB5,
+    RMB6,
+    RMB7,
+    ROL,
+    ROR,
+    RTI,
+    RTS,
+    SBC,
+    SEC,
+    SED,
+    SEI,
+    SMB0,
+    SMB1,
+    SMB2,
+    SMB3,
+    SMB4,
+    SMB5,
+    SMB6,
+    SMB7,
+    STA,
+    STP,
+    STX,
+    STY,
+    STZ,
+    TAX,
+    TAY,
+    TRB,
+    TSB,
+    TSX,
+    TXA,
+    TXS,
+    TYA,
+    WAI,
+    ILL,
+}
 
 pub trait HasDescription {
     fn desc(&self) -> &str;
@@ -541,6 +633,10 @@ impl CPU {
         self._load_memory_byte_hi(addr);
         self.cycle.plus(1)
     }
+    fn load_memory_word(&mut self, addr: u16) -> Cycle {
+        self.load_memory_byte_lo(addr)
+        .fplus(self.load_memory_byte_hi(addr + 1))
+    }
     fn _store_memory_byte(&mut self, addr: u16, byte: u8) {
         let addr: usize = addr.into();
         self.mem[addr] = byte;
@@ -653,6 +749,10 @@ impl CPU {
         let hi: u8 = (pc >> 8).try_into().unwrap();
         self.stack_push_byte(hi)
     }
+    fn stack_push_pc(&mut self, increment: u8) -> Cycle {
+        self.stack_push_pc_hi(increment)
+        .fplus(self.stack_push_pc_lo(increment))
+    }
     fn stack_push_flags(&mut self) -> Cycle {
         self.stack_push_byte(self.st.0)
     }
@@ -675,6 +775,10 @@ impl CPU {
         let addr: u16 = Self::addr_add(self.pc, 2);
         self.load_memory_byte_hi(addr)
     }
+    fn load_word_arg(&mut self) -> Cycle {
+        self.load_byte_arg_lo()
+        .fplus(self.load_byte_arg_hi())
+    }
     fn load_indexed_x_lo(&mut self) -> Cycle {
         let addr: u16 = u16::from_le_bytes(self.tmp);
         self.tmp_addr = Self::addr_add(addr, self.x) & 0xff;
@@ -684,6 +788,17 @@ impl CPU {
         let ret = self.load_memory_byte_hi(self.tmp_addr);
         self.tmp_addr = u16::from_le_bytes(self.tmp);
         ret
+    }
+    fn load_absolute_lo(&mut self) -> Cycle {
+        self.load_byte_arg_lo()
+            .fplus(self.load_byte_arg_hi())
+            .fplus({
+                self.tmp_addr = u16::from_le_bytes(self.tmp);
+                self.load_memory_byte_lo(self.tmp_addr)
+            })
+    }
+    fn load_absolute_hi(&mut self) -> Cycle {
+        self.load_memory_byte_hi(self.tmp_addr)
     }
     fn compare_and_set_flags(&mut self, byte: u8) {
         match self.a.cmp(&byte) {
@@ -701,17 +816,23 @@ impl CPU {
             ),
         };
     }
-    fn check_and_set_nz_flags(&mut self, byte: u8) {
+    fn check_and_set_z_flag(&mut self, byte: u8) {
         if byte == 0 {
             self.set_flag(StatusFlag::Zero);
         } else {
             self.clear_flag(StatusFlag::Zero);
         }
-        if byte >= 0x80 {
-            self.set_flag(StatusFlag::Negative);
-        } else {
+    }
+    fn check_and_set_n_flag(&mut self, byte: u8) {
+        if byte & 0x80 == 0 {
             self.clear_flag(StatusFlag::Negative);
+        } else {
+            self.set_flag(StatusFlag::Negative);
         }
+    }
+    fn check_and_set_nz_flags(&mut self, byte: u8) {
+        self.check_and_set_z_flag(byte);
+        self.check_and_set_n_flag(byte);
     }
 
     pub fn step(&mut self) {
@@ -773,9 +894,34 @@ impl CPU {
             }
 
             (Instruction::ASL, AddrMode::Accumulator, _) => Cycle(0),
-            (Instruction::TSB, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::ORA, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::ASL, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::TSB, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::TSB, AddrMode::Absolute, 5) => {
+                self.check_and_set_z_flag(self.a & self.tmp[0]);
+                self.store_memory_byte(self.tmp_addr, self.a | self.tmp[0]);
+                self.inc_pc(3)
+            }
+
+            (Instruction::ORA, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::ORA, AddrMode::Absolute, 5) => {
+                self.a = self.a | self.tmp[0];
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(3)
+            }
+
+            (Instruction::ASL, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::ASL, AddrMode::Absolute, 5) => {
+                if self.tmp[0] >= 0x80 {
+                    self.set_flag(StatusFlag::Carry);
+                } else {
+                    self.clear_flag(StatusFlag::Carry);
+                }
+                let ret = self.tmp[0] << 1;
+                self.check_and_set_nz_flags(ret);
+                self.store_memory_byte(self.tmp_addr, ret);
+                self.inc_pc(3)
+            }
+
             (Instruction::BBR0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::BPL, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::ORA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
@@ -792,19 +938,19 @@ impl CPU {
 
             (Instruction::ORA, AddrMode::AbsoluteIndexedWithY, _) => Cycle(0),
             (Instruction::INC, AddrMode::Accumulator, _) => Cycle(0),
-            (Instruction::TRB, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::TRB, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::TRB, AddrMode::Absolute, 5) => {
+                self.check_and_set_z_flag(self.a & self.tmp[0]);
+                self.store_memory_byte(self.tmp_addr, !self.a & self.tmp[0])
+            }
+
             (Instruction::ORA, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::ASL, AddrMode::AbsoluteIndexedWithX, _) => Cycle(0),
             (Instruction::BBR1, AddrMode::ProgramCounterRelative, _) => Cycle(0),
 
-            (Instruction::JSR, AddrMode::Absolute, 2) => self.stack_push_pc_hi(3),
-            (Instruction::JSR, AddrMode::Absolute, 3) => self.stack_push_pc_lo(3),
-            (Instruction::JSR, AddrMode::Absolute, 4) => {
-                self.load_memory_byte_lo(Self::addr_add(self.pc, 1))
-            }
-            (Instruction::JSR, AddrMode::Absolute, 5) => {
-                self.load_memory_byte_hi(Self::addr_add(self.pc, 2))
-            }
+            (Instruction::JSR, AddrMode::Absolute, 2) => self.stack_push_pc(3),
+            (Instruction::JSR, AddrMode::Absolute, 4) => self.load_word_arg(),
             (Instruction::JSR, AddrMode::Absolute, 6) => self.set_pc(),
 
             (Instruction::AND, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
@@ -822,9 +968,40 @@ impl CPU {
             }
 
             (Instruction::ROL, AddrMode::Accumulator, _) => Cycle(0),
-            (Instruction::BIT, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::AND, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::ROL, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::BIT, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::BIT, AddrMode::Absolute, 5) => {
+                let test = self.a & self.tmp[0];
+                self.check_and_set_nz_flags(test);
+                if test & 0x40 == 0 {
+                    self.clear_flag(StatusFlag::Overflow);
+                } else {
+                    self.set_flag(StatusFlag::Overflow);
+                }
+                self.inc_pc(3)
+            }
+
+            (Instruction::AND, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::AND, AddrMode::Absolute, 5) => {
+                self.a = self.a & self.tmp[0];
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(3)
+            }
+
+            (Instruction::ROL, AddrMode::Absolute, 2) => self.load_byte_arg_lo(),
+            (Instruction::ROL, AddrMode::Absolute, 5) => {
+                let old_carry = self.st.is_set(StatusFlag::Carry);
+                if self.tmp[0] & 0x80 == 0x80 {
+                    self.set_flag(StatusFlag::Carry);
+                } else {
+                    self.clear_flag(StatusFlag::Carry);
+                }
+                let res = self.tmp[0] << 1;
+                let res = res | if old_carry {1} else {0};
+                self.store_memory_byte(self.tmp_addr, res);
+                self.inc_pc(3)
+            }
+
             (Instruction::BBR2, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::BMI, AddrMode::ProgramCounterRelative, _) => Cycle(0),
             (Instruction::AND, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
@@ -872,9 +1049,29 @@ impl CPU {
 
             (Instruction::EOR, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::LSR, AddrMode::Accumulator, _) => Cycle(0),
-            (Instruction::JMP, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::EOR, AddrMode::Absolute, _) => Cycle(0),
-            (Instruction::LSR, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::JMP, AddrMode::Absolute, 2) => self.load_word_arg(),
+            (Instruction::JMP, AddrMode::Absolute, 4) => self.set_pc(),
+
+            (Instruction::EOR, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::EOR, AddrMode::Absolute, 5) => {
+                self.a = self.a ^ self.tmp[0];
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(3)
+            }
+ 
+            (Instruction::LSR, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::LSR, AddrMode::Absolute, 5) => {
+                if self.tmp[0] & 0x1 == 1 {
+                    self.set_flag(StatusFlag::Carry);
+                } else {
+                    self.clear_flag(StatusFlag::Carry);
+                }
+                let res = self.tmp[0] >> 1;
+                self.store_memory_byte(self.tmp_addr, res);
+                self.inc_pc(3)
+            }
+
             (Instruction::BBR4, AddrMode::ProgramCounterRelative, _) => Cycle(0),
 
             (Instruction::BVC, AddrMode::ProgramCounterRelative, 2)
@@ -929,7 +1126,34 @@ impl CPU {
             (Instruction::ADC, AddrMode::Immediate, _) => Cycle(0),
             (Instruction::ROR, AddrMode::Accumulator, _) => Cycle(0),
             (Instruction::JMP, AddrMode::AbsoluteIndirect, _) => Cycle(0),
-            (Instruction::ADC, AddrMode::Absolute, _) => Cycle(0),
+
+            (Instruction::ADC, AddrMode::Absolute, 2) => self.load_absolute_lo(),
+            (Instruction::ADC, AddrMode::Absolute, 5) => {
+                // add the two numbers
+                let a = self.a;
+                let b = self.tmp[0];
+                let res = a.wrapping_add(b);
+                // An overflow occurs if and only if two numbers with the same sign are added,
+                // but the result has the opposite sign:
+                let ofl1 = (a ^ res) & (b ^ res) & 0x80 != 0;
+
+                // add the carry
+                let a = res;
+                let b: u8 = if self.st.is_set(StatusFlag::Carry) {1} else {0};
+                let res = a.wrapping_add(b);
+                let ofl2 = (a ^ res) & (b ^ res) & 0x80 != 0;
+
+                if ofl1 || ofl2 {
+                    self.set_flag(StatusFlag::Overflow);
+                } else {
+                    self.clear_flag(StatusFlag::Overflow);
+                }
+
+                self.check_and_set_nz_flags(res);
+                self.a = res;
+                self.inc_pc(3)
+            }
+
             (Instruction::ROR, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::BBR6, AddrMode::ProgramCounterRelative, _) => Cycle(0),
 
@@ -1251,9 +1475,7 @@ impl CPU {
 
             (Instruction::SBC, AddrMode::Immediate, _) => Cycle(0),
 
-            (Instruction::NOP, AddrMode::Implied, 2) => {
-                self.inc_pc(1)
-            }
+            (Instruction::NOP, AddrMode::Implied, 2) => self.inc_pc(1),
 
             (Instruction::CPX, AddrMode::Absolute, _) => Cycle(0),
             (Instruction::SBC, AddrMode::Absolute, _) => Cycle(0),
