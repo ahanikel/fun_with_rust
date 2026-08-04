@@ -1,9 +1,22 @@
-use std::io::Read;
-
 mod cpu6502;
 mod heap;
+use cpu6502::CPU;
+use cpu6502::Instruction;
+use cpu6502::HasDescription;
+use cpu6502::IsOriginal;
+use cpu6502::AddrMode;
 
 fn main() {
+    _run_heap();
+    let mut cpu: CPU = CPU::new();
+    cpu.reset();
+    cpu.step();
+    println!("{} (Absolute {} original)", Instruction::LDA.desc(),
+    if AddrMode::Absolute.is_original() {
+        "is"
+    } else {
+        "is not"
+    });
 }
 
 fn _run_heap() {
