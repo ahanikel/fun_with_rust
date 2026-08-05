@@ -1,4 +1,5 @@
-#[allow(unused)]
+#[cfg(test)]
+
 use super::*;
 
 #[test]
@@ -60,9 +61,9 @@ fn test_cmp_zpx_ind_lt() {
     for _step in 0..15 {
         cpu.step();
     }
-    assert!(cpu.st.is_set(StatusFlag::Negative));
-    assert!(cpu.st.is_clear(StatusFlag::Zero));
-    assert!(cpu.st.is_clear(StatusFlag::Carry));
+    assert!(cpu.is_set(StatusFlag::Negative));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Carry));
 }
 
 #[test]
@@ -80,9 +81,9 @@ fn test_cmp_zpx_ind_eq() {
     for _step in 0..15 {
         cpu.step();
     }
-    assert!(cpu.st.is_clear(StatusFlag::Negative));
-    assert!(cpu.st.is_set(StatusFlag::Zero));
-    assert!(cpu.st.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert!(cpu.is_set(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Carry));
 }
 
 #[test]
@@ -100,7 +101,7 @@ fn test_cmp_zpx_ind_gt() {
     for _step in 0..15 {
         cpu.step();
     }
-    assert!(cpu.st.is_clear(StatusFlag::Negative));
-    assert!(cpu.st.is_clear(StatusFlag::Zero));
-    assert!(cpu.st.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Carry));
 }
