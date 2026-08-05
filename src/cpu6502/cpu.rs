@@ -25,7 +25,7 @@ impl CPU {
             a: 0,
             x: 0,
             y: 0,
-            st: StatusFlags(0),
+            st: StatusFlags(32),
             pc: 0,
             sp: 0xff,
             cycle: Cycle(0),
@@ -43,7 +43,7 @@ impl CPU {
         self._load_memory_byte_lo(0xfffc);
         self._load_memory_byte_hi(0xfffd);
         self.pc = u16::from_le_bytes(self.tmp);
-        self.st = StatusFlags(0);
+        self.st = StatusFlags(32);
         self.irq = false;
         self.nmi = false;
         self.cycle = Cycle(0);

@@ -96,12 +96,40 @@ impl CPU {
                 self.set_pc()
             }
 
-            (Instruction::ORA, AddrMode::ZeroPageIndexedIndirect, _) => Cycle(0),
-            (Instruction::TSB, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::ORA, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::ASL, AddrMode::ZeroPage, _) => Cycle(0),
+            (Instruction::ORA, AddrMode::ZeroPageIndexedIndirect, 2) => self.load_zp_indexed_indirect_byte(),
+            (Instruction::ORA, AddrMode::ZeroPageIndexedIndirect, 4) => {
+                self.a = self.a | self.tmp[0];
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(2)
+            }
+
+            (Instruction::TSB, AddrMode::ZeroPage, 2) => self.load_zp_arg(),
+            (Instruction::TSB, AddrMode::ZeroPage, 3) => {
+                self.check_and_set_z_flag(self.a & self.tmp[0]);
+                self.store_memory_byte(self.tmp_addr, self.a | self.tmp[0]);
+                self.inc_pc(2)
+            }
+
+            (Instruction::ORA, AddrMode::ZeroPage, 2) => self.load_zp_arg(),
+            (Instruction::ORA, AddrMode::ZeroPage, 3) => {
+                self.a = self.a | self.tmp[0];
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(2)
+            }
+
+            (Instruction::ASL, AddrMode::ZeroPage, 2) => self.load_zp_arg(),
+            (Instruction::ASL, AddrMode::ZeroPage, 3) => {
+                self.set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x80 != 0);
+                let ret = self.tmp[0] << 1;
+                self.check_and_set_nz_flags(ret);
+                self.store_memory_byte(self.tmp_addr, ret);
+                self.inc_pc(2)
+            }
+
             (Instruction::RMB0, AddrMode::ZeroPage, _) => Cycle(0),
-            (Instruction::PHP, AddrMode::Stack, _) => Cycle(0),
+
+            (Instruction::PHP, AddrMode::Stack, 2) => self.stack_push_flags(),
+            (Instruction::PHP, AddrMode::Stack, 3) => self.inc_pc(1),
 
             (Instruction::ORA, AddrMode::Immediate, 2) => {
                 self.load_byte_arg();
@@ -110,7 +138,12 @@ impl CPU {
                 self.inc_pc(2)
             }
 
-            (Instruction::ASL, AddrMode::Accumulator, _) => Cycle(0),
+            (Instruction::ASL, AddrMode::Accumulator, 2) => {
+                self.set_or_clear_flag(StatusFlag::Carry, self.a & 0x80 != 0);
+                self.a = self.a << 1;
+                self.check_and_set_nz_flags(self.a);
+                self.inc_pc(1)
+            }
 
             (Instruction::TSB, AddrMode::Absolute, 2) => self.load_absolute_byte(),
             (Instruction::TSB, AddrMode::Absolute, 5) => {
@@ -140,7 +173,15 @@ impl CPU {
             }
 
             (Instruction::BBR0, AddrMode::ProgramCounterRelative, _) => Cycle(0),
-            (Instruction::BPL, AddrMode::ProgramCounterRelative, _) => Cycle(0),
+
+            (Instruction::BPL, AddrMode::ProgramCounterRelative, 2) if self.is_clear(StatusFlag::Negative) => {
+                let ret = self.load_byte_arg();
+                self.inc_pc(self.tmp[0]);
+                ret
+            }
+            (Instruction::BPL, AddrMode::ProgramCounterRelative, 2) => self.inc_pc(2),
+            (Instruction::BPL, AddrMode::ProgramCounterRelative, 3) => self.inc_pc(2),
+
             (Instruction::ORA, AddrMode::ZeroPageIndirectIndexedWithY, _) => Cycle(0),
             (Instruction::ORA, AddrMode::ZeroPageIndirect, _) => Cycle(0),
             (Instruction::TRB, AddrMode::ZeroPage, _) => Cycle(0),

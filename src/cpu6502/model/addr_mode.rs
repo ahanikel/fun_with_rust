@@ -135,6 +135,15 @@ impl CPU {
         self.tmp_addr = u16::from_le_bytes(self.tmp);
         ret
     }
+    /**
+     * Load the zeropage address argument into tmp_addr
+     * Takes 1 cycle
+     */
+    pub fn load_zp_arg(&mut self) -> Cycle {
+        let ret = self.load_byte_arg();
+        self.tmp_addr = u16::from_le_bytes(self.tmp);
+        ret
+    }
     pub fn load_indexed_x_lo(&mut self) -> Cycle {
         let addr: u16 = u16::from_le_bytes(self.tmp);
         self.tmp_addr = Self::addr_add(addr, self.x) & 0xff;
@@ -169,6 +178,15 @@ impl CPU {
     pub fn load_absolute_word(&mut self) -> Cycle {
         self._load_absolute_lo()
         .fplus(self._load_absolute_hi())
+    }
+    /**
+     * Loads a byte from the (zp,x) address in the argument
+     * Takes 2 cycles
+     */
+    pub fn load_zp_indexed_indirect_byte(&mut self) -> Cycle {
+        let ret = self.load_zp_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        ret.fplus(self.load_memory_byte_lo(self.tmp_addr))
     }
 }
  
