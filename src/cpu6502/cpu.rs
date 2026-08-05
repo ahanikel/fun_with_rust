@@ -81,8 +81,7 @@ impl CPU {
         self.st.0 & flag == 0
     }
     pub fn set_pc(&mut self) -> Cycle {
-        let pc: u16 = u16::from_le_bytes(self.tmp);
-        self.pc = pc;
+        self.pc = self.tmp_addr;
         Cycle(0)
     }
     pub fn inc_pc(&mut self, arg: u8) -> Cycle {

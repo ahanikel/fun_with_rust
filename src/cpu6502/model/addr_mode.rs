@@ -101,18 +101,39 @@ impl CPU {
         self.st.0 = self.tmp[0];
         self.cycle.plus(1)
     }
-   pub fn load_byte_arg_lo(&mut self) -> Cycle {
+    fn _load_byte_arg_lo(&mut self) -> Cycle {
         let addr: u16 = Self::addr_add(self.pc, 1);
-        self.tmp[1] = 0;
         self.load_memory_byte_lo(addr)
     }
-    pub fn load_byte_arg_hi(&mut self) -> Cycle {
+    fn _load_byte_arg_hi(&mut self) -> Cycle {
         let addr: u16 = Self::addr_add(self.pc, 2);
         self.load_memory_byte_hi(addr)
     }
+    /**
+     * Load the byte-sized argument into tmp[0]
+     * tmp[1] is set to 0
+     * Takes 1 cycle
+     */
+    pub fn load_byte_arg(&mut self) -> Cycle {
+        self.tmp[1] = 0;
+        self._load_byte_arg_lo()
+    }
+    /**
+     * Load the word-sized argument into tmp
+     * Takes 2 cycles
+     */
     pub fn load_word_arg(&mut self) -> Cycle {
-        self.load_byte_arg_lo()
-        .fplus(self.load_byte_arg_hi())
+        self._load_byte_arg_lo()
+        .fplus(self._load_byte_arg_hi())
+    }
+    /**
+     * Load the address argument into tmp_addr
+     * Takes 2 cycles
+     */
+    pub fn load_addr_arg(&mut self) -> Cycle {
+        let ret = self.load_word_arg();
+        self.tmp_addr = u16::from_le_bytes(self.tmp);
+        ret
     }
     pub fn load_indexed_x_lo(&mut self) -> Cycle {
         let addr: u16 = u16::from_le_bytes(self.tmp);
@@ -124,17 +145,30 @@ impl CPU {
         self.tmp_addr = u16::from_le_bytes(self.tmp);
         ret
     }
-    pub fn load_absolute_lo(&mut self) -> Cycle {
-        self.load_byte_arg_lo()
-            .fplus(self.load_byte_arg_hi())
+    fn _load_absolute_lo(&mut self) -> Cycle {
+        self.load_addr_arg()
             .fplus({
-                self.tmp_addr = u16::from_le_bytes(self.tmp);
                 self.load_memory_byte_lo(self.tmp_addr)
             })
     }
-    #[allow(dead_code)]
-    pub fn load_absolute_hi(&mut self) -> Cycle {
+    fn _load_absolute_hi(&mut self) -> Cycle {
         self.load_memory_byte_hi(self.tmp_addr)
+    }
+    /**
+     * Loads a byte from the address pointed at by the address argument
+     * Takes 3 cycles
+     */
+    pub fn load_absolute_byte(&mut self) -> Cycle {
+        self._load_absolute_lo()
+    }
+    /**
+     * Loads a word from the address pointed at by the address argument
+     * Takes 4 cycles
+     */
+    #[allow(dead_code)]
+    pub fn load_absolute_word(&mut self) -> Cycle {
+        self._load_absolute_lo()
+        .fplus(self._load_absolute_hi())
     }
 }
  
