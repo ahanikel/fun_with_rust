@@ -180,10 +180,65 @@ impl CPU {
         .fplus(self._load_absolute_hi())
     }
     /**
+     * Loads a byte from a,x
+     * Takes 3 cycles
+     */
+    pub fn load_absolute_indexed_with_x_byte(&mut self) -> Cycle {
+        let ret = self.load_addr_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        ret.fplus(self.load_memory_byte_lo(self.tmp_addr))
+    }
+     /**
+     * Loads a byte from a,y
+     * Takes 3 cycles
+     */
+    pub fn load_absolute_indexed_with_y_byte(&mut self) -> Cycle {
+        let ret = self.load_addr_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+        ret.fplus(self.load_memory_byte_lo(self.tmp_addr))
+    }
+    /**
      * Loads a byte from the (zp,x) address in the argument
      * Takes 2 cycles
      */
     pub fn load_zp_indexed_indirect_byte(&mut self) -> Cycle {
+        let ret = self.load_zp_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        ret
+            .fplus(self.load_memory_addr(self.tmp_addr))
+            .fplus(self.load_memory_byte_lo(self.tmp_addr))
+    }
+    /**
+     * Load a byte from the (zp) address in the argument
+     * Takes 2 cycles
+     */
+    pub fn load_zp_indirect_byte(&mut self) -> Cycle {
+        self.load_zp_arg()
+            .fplus(self.load_memory_addr(self.tmp_addr))
+            .fplus(self.load_memory_byte_lo(self.tmp_addr))
+    }
+    /**
+     * Load a byte from the (zp),y address in the argument
+     * Takes 2 cycles
+     */
+    pub fn load_zp_indirect_indexed_with_y_byte(&mut self) -> Cycle {
+        let ret = self.load_zp_indirect_byte();
+        self.tmp[0] = self.tmp[0] + self.y;
+        ret
+    }
+    /**
+     * Load a byte from the zp address in the argument
+     * Takes 2 cycles
+     */
+    pub fn load_zp_byte(&mut self) -> Cycle {
+        self.load_zp_arg()
+            .fplus(self.load_memory_byte_lo(self.tmp_addr))
+    }
+    /**
+     * Load a byte from the zp,x address in the argument
+     * Takes 2 cycles
+     */
+     pub fn load_zp_indexed_with_x_byte(&mut self) -> Cycle {
         let ret = self.load_zp_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
         ret.fplus(self.load_memory_byte_lo(self.tmp_addr))

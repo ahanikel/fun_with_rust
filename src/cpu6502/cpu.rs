@@ -115,7 +115,10 @@ impl CPU {
         self._load_memory_byte_hi(addr);
         self.cycle.plus(1)
     }
-    #[allow(dead_code)]
+    /**
+     * Load a word at address addr into self.tmp
+     * Takes 2 cycles
+     */
     pub fn load_memory_word(&mut self, addr: u16) -> Cycle {
         self.load_memory_byte_lo(addr)
         .fplus(self.load_memory_byte_hi(addr + 1))
@@ -127,6 +130,15 @@ impl CPU {
     pub fn store_memory_byte(&mut self, addr: u16, byte: u8) -> Cycle {
         self._store_memory_byte(addr, byte);
         self.cycle.plus(1)
+    }
+    /**
+     * Load an address at address addr into self.tmp_addr
+     * Takes 2 cycles
+     */
+    pub fn load_memory_addr(&mut self, addr: u16) -> Cycle {
+        let ret = self.load_memory_word(addr);
+        self.tmp_addr = u16::from_le_bytes(self.tmp);
+        ret
     }
  }
 
