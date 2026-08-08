@@ -206,7 +206,7 @@ impl HasDescription for Instruction {
             Instruction::TXS => "Transfer the X register to the Stack pointer register",
             Instruction::TYA => "Transfer Y register to the Accumulator",
             Instruction::WAI => "WAit for Interrupt",
-            Instruction::ILL => "ILLegal instruction",
+            Instruction::ILL => "ILLegal opcode",
         }
     }
 }

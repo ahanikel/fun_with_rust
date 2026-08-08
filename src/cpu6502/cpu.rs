@@ -5,7 +5,7 @@ pub struct CPU {
     pub st: StatusFlags,
     pub pc: u16,
     pub sp: u8,
-    pub cycle: Cycle,
+    pub cycle: u8,
     pub mem: [u8; 65536],
     pub irq: bool,      // true if the IRQB pin is set to low
     #[allow(unused)]
@@ -28,7 +28,7 @@ impl CPU {
             st: StatusFlags(32),
             pc: 0,
             sp: 0xff,
-            cycle: Cycle(0),
+            cycle: 0,
             mem,
             irq: false,
             irq_prev: false,
@@ -40,19 +40,18 @@ impl CPU {
         }
     }
     pub fn reset(&mut self) {
-        self._load_memory_byte_lo(0xfffc);
-        self._load_memory_byte_hi(0xfffd);
+        self.load_memory_byte_lo(0xfffc);
+        self.load_memory_byte_hi(0xfffd);
         self.pc = u16::from_le_bytes(self.tmp);
         self.st = StatusFlags(32);
         self.irq = false;
         self.nmi = false;
-        self.cycle = Cycle(0);
+        self.cycle = 0;
         self.reset = true;
     }
-    pub fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) -> Cycle {
+    pub fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) {
         self.set_flags(enable);
         self.clear_flags(disable);
-        self.cycle.plus(1)
     }
     pub fn set_flag(&mut self, flag: StatusFlag) {
         let flag: u8 = flag.into();
@@ -80,11 +79,10 @@ impl CPU {
         let flag: u8 = flag.into();
         self.st.0 & flag == 0
     }
-    pub fn set_pc(&mut self) -> Cycle {
+    pub fn set_pc(&mut self) {
         self.pc = self.tmp_addr;
-        Cycle(0)
     }
-    pub fn inc_pc(&mut self, arg: u8) -> Cycle {
+    pub fn inc_pc(&mut self, arg: u8) {
         let arg_signed: i8 = arg.cast_signed();
         if arg_signed < 0 {
             let arg: i16 = arg_signed.into();
@@ -95,50 +93,34 @@ impl CPU {
             let arg: u16 = arg.into();
             self.pc = self.pc + arg;
         }
-        Cycle(0)
     }
-    pub fn _load_memory_byte_lo(&mut self, addr: u16) {
+    pub fn load_memory_byte_lo(&mut self, addr: u16) {
         // TODO: insert code for peripherals
         let addr: usize = addr.into();
         self.tmp[0] = self.mem[addr];
     }
-    pub fn load_memory_byte_lo(&mut self, addr: u16) -> Cycle {
-        self._load_memory_byte_lo(addr);
-        self.cycle.plus(1)
-    }
-    pub fn _load_memory_byte_hi(&mut self, addr: u16) {
+    pub fn load_memory_byte_hi(&mut self, addr: u16) {
         // TODO: insert code for peripherals
         let addr: usize = addr.into();
         self.tmp[1] = self.mem[addr];
     }
-    pub fn load_memory_byte_hi(&mut self, addr: u16) -> Cycle {
-        self._load_memory_byte_hi(addr);
-        self.cycle.plus(1)
-    }
     /**
      * Load a word at address addr into self.tmp
-     * Takes 2 cycles
      */
-    pub fn load_memory_word(&mut self, addr: u16) -> Cycle {
-        self.load_memory_byte_lo(addr)
-        .fplus(self.load_memory_byte_hi(addr + 1))
+    pub fn load_memory_word(&mut self, addr: u16) {
+        self.load_memory_byte_lo(addr);
+        self.load_memory_byte_hi(addr + 1);
     }
-    pub fn _store_memory_byte(&mut self, addr: u16, byte: u8) {
+    pub fn store_memory_byte(&mut self, addr: u16, byte: u8) {
         let addr: usize = addr.into();
         self.mem[addr] = byte;
     }
-    pub fn store_memory_byte(&mut self, addr: u16, byte: u8) -> Cycle {
-        self._store_memory_byte(addr, byte);
-        self.cycle.plus(1)
-    }
     /**
      * Load an address at address addr into self.tmp_addr
-     * Takes 2 cycles
      */
-    pub fn load_memory_addr(&mut self, addr: u16) -> Cycle {
-        let ret = self.load_memory_word(addr);
+    pub fn load_memory_addr(&mut self, addr: u16) {
+        self.load_memory_word(addr);
         self.tmp_addr = u16::from_le_bytes(self.tmp);
-        ret
     }
  }
 
@@ -155,8 +137,6 @@ pub enum StatusFlag {
     Overflow,
     Negative,
 }
-
-pub struct Cycle(pub(crate) u8);
 
 impl From<u8> for StatusFlag {
     fn from(value: u8) -> Self {
@@ -188,13 +168,3 @@ impl Into<u8> for StatusFlag {
         }
     }
 }
-
-impl Cycle {
-    pub fn plus(&self, n: u8) -> Cycle {
-        Cycle(self.0 + n)
-    }
-    pub fn fplus(self, other: Cycle) -> Cycle {
-        Cycle(self.0 + other.0)
-    }
-}
-
