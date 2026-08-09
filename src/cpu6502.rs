@@ -5,9 +5,8 @@ mod test;
 use cpu::{CPU, StatusFlag};
 use model::{addr_mode::AddrMode, instruction::Instruction, instruction_and_mode};
 
-
 impl CPU {
-   fn compare_and_set_flags(&mut self, reg: u8, byte: u8) {
+    fn compare_and_set_flags(&mut self, reg: u8, byte: u8) {
         match reg.cmp(&byte) {
             std::cmp::Ordering::Less => self.change_flags(
                 &[StatusFlag::Negative],
@@ -71,10 +70,16 @@ impl CPU {
             "{}: 0b{:08b} 0x{:04x} 0x{:02x}",
             self.cycle, self.st.0, self.pc, opcode
         );
-        let (inst, mode) = instruction_and_mode(opcode);
-        self.run_load(mode);
-        self.run_instruction(inst);
-        self.run_store(inst, mode);
+        if self.cycle == self.cycles {
+            self.cycle = 0;
+            self.cycles = 0;
+            let (inst, mode) = instruction_and_mode(opcode);
+            self.run_load(mode);
+            self.run_instruction(inst);
+            self.run_store(inst, mode);
+        } else {
+            self.cycle = self.cycle + 1;
+        }
     }
 
     fn run_load(&mut self, mode: AddrMode) {
@@ -100,7 +105,8 @@ impl CPU {
 
     fn run_instruction(&mut self, inst: Instruction) {
         match inst {
-            Instruction::ADC => {                // add the two numbers
+            Instruction::ADC => {
+                // add the two numbers
                 let a = self.a;
                 let b = self.tmp[0];
                 let res = a.wrapping_add(b);
@@ -110,18 +116,18 @@ impl CPU {
 
                 // add the carry
                 let a = res;
-                let b: u8 = if self.is_set(StatusFlag::Carry) {1} else {0};
+                let b: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
                 let res = a.wrapping_add(b);
                 let ofl2 = (a ^ res) & (b ^ res) & 0x80 != 0;
                 self.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
 
                 self.check_and_set_nz_flags(res);
                 self.a = res;
-            },
+            }
             Instruction::AND => {
                 self.a = self.a & self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
-            },
+            }
             Instruction::ASL => {
                 self.set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x80 != 0);
                 self.tmp[0] = self.tmp[0] << 1;
@@ -143,17 +149,41 @@ impl CPU {
             Instruction::BBS5 => self.tmp[0] = self.tmp[0] & 0x20,
             Instruction::BBS6 => self.tmp[0] = self.tmp[0] & 0x40,
             Instruction::BBS7 => self.tmp[0] = self.tmp[0] & 0x80,
-            Instruction::BCC => self.tmp[0] = if self.is_clear(StatusFlag::Carry) {1} else {0},
-            Instruction::BCS => self.tmp[0] = if self.is_set(StatusFlag::Carry) {1} else {0},
-            Instruction::BEQ => self.tmp[0] = if self.is_set(StatusFlag::Zero) {1} else {0},
+            Instruction::BCC => {
+                self.tmp[0] = if self.is_clear(StatusFlag::Carry) {
+                    1
+                } else {
+                    0
+                }
+            }
+            Instruction::BCS => self.tmp[0] = if self.is_set(StatusFlag::Carry) { 1 } else { 0 },
+            Instruction::BEQ => self.tmp[0] = if self.is_set(StatusFlag::Zero) { 1 } else { 0 },
             Instruction::BIT => {
                 let test = self.a & self.tmp[0];
                 self.check_and_set_nz_flags(test);
                 self.check_and_set_or_clear_flag(StatusFlag::Overflow, test & 0x40);
-            },
-            Instruction::BMI => self.tmp[0] = if self.is_set(StatusFlag::Negative) {1} else {0},
-            Instruction::BNE => self.tmp[0] = if self.is_clear(StatusFlag::Zero) {1} else {0},
-            Instruction::BPL => self.tmp[0] = if self.is_clear(StatusFlag::Negative) {1} else {0},
+            }
+            Instruction::BMI => {
+                self.tmp[0] = if self.is_set(StatusFlag::Negative) {
+                    1
+                } else {
+                    0
+                }
+            }
+            Instruction::BNE => {
+                self.tmp[0] = if self.is_clear(StatusFlag::Zero) {
+                    1
+                } else {
+                    0
+                }
+            }
+            Instruction::BPL => {
+                self.tmp[0] = if self.is_clear(StatusFlag::Negative) {
+                    1
+                } else {
+                    0
+                }
+            }
             Instruction::BRA => self.tmp[0] = 1,
             Instruction::BRK => {
                 if self.is_set(StatusFlag::BRK) {
@@ -165,9 +195,21 @@ impl CPU {
                         &[StatusFlag::Decimal],
                     );
                 }
-            },
-            Instruction::BVC => self.tmp[0] = if self.is_clear(StatusFlag::Overflow) {1} else {0},
-            Instruction::BVS => self.tmp[0] = if self.is_set(StatusFlag::Overflow) {1} else {0},
+            }
+            Instruction::BVC => {
+                self.tmp[0] = if self.is_clear(StatusFlag::Overflow) {
+                    1
+                } else {
+                    0
+                }
+            }
+            Instruction::BVS => {
+                self.tmp[0] = if self.is_set(StatusFlag::Overflow) {
+                    1
+                } else {
+                    0
+                }
+            }
             Instruction::CLC => self.clear_flag(StatusFlag::Carry),
             Instruction::CLD => self.clear_flag(StatusFlag::Decimal),
             Instruction::CLI => self.clear_flag(StatusFlag::IRQDisable),
@@ -178,61 +220,61 @@ impl CPU {
             Instruction::DEC => {
                 self.tmp[0] = self.tmp[0].wrapping_sub(1);
                 self.check_and_set_nz_flags(self.tmp[0]);
-            },
+            }
             Instruction::DEX => {
                 self.x = self.x.wrapping_sub(1);
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::DEY => {
                 self.y = self.y.wrapping_sub(1);
                 self.check_and_set_nz_flags(self.y);
-            },
+            }
             Instruction::EOR => {
                 self.a = self.a ^ self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
-            },
+            }
             Instruction::INC => {
                 self.tmp[0] = self.tmp[0].wrapping_add(1);
                 self.check_and_set_nz_flags(self.tmp[0]);
-            },
+            }
             Instruction::INX => {
                 self.x = self.x.wrapping_add(1);
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::INY => {
                 self.y = self.y.wrapping_add(1);
                 self.check_and_set_nz_flags(self.y);
-            },
+            }
             Instruction::JMP => {
                 self.load_addr_arg();
                 self.set_pc();
-            },
+            }
             Instruction::JSR => {
                 self.stack_push_pc(3);
                 self.load_addr_arg();
                 self.set_pc();
-            },
+            }
             Instruction::LDA => {
                 self.a = self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
-            },
+            }
             Instruction::LDX => {
                 self.x = self.tmp[0];
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::LDY => {
                 self.y = self.tmp[0];
                 self.check_and_set_nz_flags(self.y);
-            },
+            }
             Instruction::LSR => {
                 self.check_and_set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x1);
                 self.tmp[0] = self.tmp[0] >> 1;
-            },
-            Instruction::NOP => {},
+            }
+            Instruction::NOP => {}
             Instruction::ORA => {
                 self.a = self.a | self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
-            },
+            }
             Instruction::PHA => {
                 self.tmp[0] = self.a;
                 self.stack_push_byte();
@@ -256,12 +298,12 @@ impl CPU {
                 self.stack_pull_byte();
                 self.x = self.tmp[0];
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::PLY => {
                 self.stack_pull_byte();
                 self.y = self.tmp[0];
                 self.check_and_set_nz_flags(self.y);
-            },
+            }
             Instruction::RMB0 => self.store_memory_byte(self.tmp_addr, self.tmp[0] & !0x01),
             Instruction::RMB1 => self.store_memory_byte(self.tmp_addr, self.tmp[0] & !0x02),
             Instruction::RMB2 => self.store_memory_byte(self.tmp_addr, self.tmp[0] & !0x04),
@@ -273,9 +315,9 @@ impl CPU {
             Instruction::ROL => {
                 let old_carry = self.is_set(StatusFlag::Carry);
                 self.check_and_set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x80);
-                self.tmp[0]= self.tmp[0] << 1;
-                self.tmp[0] = self.tmp[0] | if old_carry {1} else {0};
-            },
+                self.tmp[0] = self.tmp[0] << 1;
+                self.tmp[0] = self.tmp[0] | if old_carry { 1 } else { 0 };
+            }
             Instruction::ROR => {
                 let old_carry = self.is_set(StatusFlag::Carry);
                 let b0 = self.tmp[0] & 1;
@@ -285,16 +327,16 @@ impl CPU {
                     self.tmp[0] = self.tmp[0] | 0x80;
                 }
                 self.check_and_set_nz_flags(self.tmp[0]);
-            },
+            }
             Instruction::RTI => {
                 self.stack_pull_flags();
                 self.stack_pull_addr();
                 self.set_pc();
-            },
+            }
             Instruction::RTS => {
                 self.stack_pull_addr();
                 self.set_pc();
-            },
+            }
             Instruction::SBC => {
                 // add the accumulator and the complement of the argument
                 let a = self.a;
@@ -306,14 +348,14 @@ impl CPU {
 
                 // add the carry
                 let a = res;
-                let b: u8 = if self.is_set(StatusFlag::Carry) {1} else {0};
+                let b: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
                 let res = a.wrapping_add(b);
                 let ofl2 = (a ^ res) & (b ^ res) & 0x80 != 0;
                 self.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
 
                 self.check_and_set_nz_flags(res);
                 self.a = res;
-            },
+            }
             Instruction::SEC => self.set_flag(StatusFlag::Carry),
             Instruction::SED => self.set_flag(StatusFlag::Decimal),
             Instruction::SEI => self.set_flag(StatusFlag::IRQDisable),
@@ -326,94 +368,80 @@ impl CPU {
             Instruction::SMB6 => self.store_memory_byte(self.tmp_addr, self.tmp[0] & !0x40),
             Instruction::SMB7 => self.store_memory_byte(self.tmp_addr, self.tmp[0] & !0x80),
             Instruction::STA => self.store_memory_byte(self.tmp_addr, self.a),
-            Instruction::STP => {},
+            Instruction::STP => {}
             Instruction::STX => self.store_memory_byte(self.tmp_addr, self.x),
             Instruction::STY => self.store_memory_byte(self.tmp_addr, self.y),
             Instruction::STZ => self.store_memory_byte(self.tmp_addr, 0),
             Instruction::TAX => {
                 self.x = self.a;
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::TAY => {
                 self.y = self.a;
                 self.check_and_set_nz_flags(self.y);
-            },
+            }
             Instruction::TRB => {
                 self.check_and_set_z_flag(self.a & self.tmp[0]);
                 self.store_memory_byte(self.tmp_addr, !self.a & self.tmp[0])
-            },
+            }
             Instruction::TSB => {
                 self.check_and_set_z_flag(self.a & self.tmp[0]);
                 self.store_memory_byte(self.tmp_addr, self.a | self.tmp[0]);
-            },
+            }
             Instruction::TSX => {
                 self.x = self.sp;
                 self.check_and_set_nz_flags(self.x);
-            },
+            }
             Instruction::TXA => {
                 self.a = self.x;
                 self.check_and_set_nz_flags(self.a);
-            },
+            }
             Instruction::TXS => self.sp = self.x,
             Instruction::TYA => {
                 self.a = self.y;
                 self.check_and_set_nz_flags(self.a);
-            },
-            Instruction::WAI => {},
-            Instruction::ILL => {},
+            }
+            Instruction::WAI => {}
+            Instruction::ILL => {}
         }
     }
 
     fn run_store(&mut self, inst: Instruction, mode: AddrMode) {
+        self.cycles = self.cycles + mode.get_cycles();
         match (inst, mode) {
-            (_, AddrMode::Absolute) => {
-                self.inc_pc(3)
+            (_, AddrMode::Absolute) => self.inc_pc(3),
+            (_, AddrMode::AbsoluteIndexedIndirect) => self.inc_pc(3),
+            (Instruction::STA, AddrMode::AbsoluteIndexedWithX) => {
+                self.cycles = self.cycles + 1;
+                self.inc_pc(3);
             }
-            (_, AddrMode::AbsoluteIndexedIndirect) => {
-                self.inc_pc(3)
-            }
-            (_, AddrMode::AbsoluteIndexedWithX) => {
-                self.inc_pc(3)
-            }
-            (_, AddrMode::AbsoluteIndexedWithY) => {
-                self.inc_pc(3)
-            }
-            (_, AddrMode::AbsoluteIndirect) => {
-                self.inc_pc(3)
-            }
-            (_, AddrMode::Accumulator) => {
-                self.inc_pc(1)
-            }
-            (_, AddrMode::Immediate) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::Implied) => {
-                self.inc_pc(1)
-            }
+            (_, AddrMode::AbsoluteIndexedWithX) => self.inc_pc(3),
+            (_, AddrMode::AbsoluteIndexedWithY) => self.inc_pc(3),
+            (_, AddrMode::AbsoluteIndirect) => self.inc_pc(3),
+            (_, AddrMode::Accumulator) => self.inc_pc(1),
+            (_, AddrMode::Immediate) => self.inc_pc(2),
+            (_, AddrMode::Implied) => self.inc_pc(1),
             (_, AddrMode::Relative) => {
-                self.inc_pc(2)
+                let take_branch = self.tmp[0] != 0;
+                self.load_byte_arg();
+                let old_pc = self.pc;
+                if take_branch {
+                    self.inc_pc(self.tmp[0]);
+                    self.cycles = self.cycles + 1;
+                } else {
+                    self.inc_pc(2)
+                }
+                if old_pc & 0xff00 != self.pc & 0xff00 {
+                    self.cycles = self.cycles + 1;
+                }
             }
-            (_, AddrMode::ZeroPage) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageIndexedIndirect) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageIndexedWithX) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageIndexedWithY) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageIndirect) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageIndirectIndexedWithY) => {
-                self.inc_pc(2)
-            }
-            (_, AddrMode::ZeroPageRelative) => {
-                self.inc_pc(3)
-            }
+            (_, AddrMode::ZeroPage) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageIndexedIndirect) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageIndexedWithX) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageIndexedWithY) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageIndirect) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageIndirectIndexedWithY) => self.inc_pc(2),
+            (_, AddrMode::ZeroPageRelative) => self.inc_pc(3),
         }
     }
 }

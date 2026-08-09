@@ -6,6 +6,7 @@ pub struct CPU {
     pub pc: u16,
     pub sp: u8,
     pub cycle: u8,
+    pub cycles: u8,
     pub mem: [u8; 65536],
     pub irq: bool,      // true if the IRQB pin is set to low
     #[allow(unused)]
@@ -29,6 +30,7 @@ impl CPU {
             pc: 0,
             sp: 0xff,
             cycle: 0,
+            cycles: 0,
             mem,
             irq: false,
             irq_prev: false,
@@ -47,6 +49,7 @@ impl CPU {
         self.irq = false;
         self.nmi = false;
         self.cycle = 0;
+        self.cycles = 0;
         self.reset = true;
     }
     pub fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) {
@@ -84,15 +87,7 @@ impl CPU {
     }
     pub fn inc_pc(&mut self, arg: u8) {
         let arg_signed: i8 = arg.cast_signed();
-        if arg_signed < 0 {
-            let arg: i16 = arg_signed.into();
-            let arg: i16 = arg.abs();
-            let arg: u16 = arg.cast_unsigned();
-            self.pc = self.pc - arg;
-        } else {
-            let arg: u16 = arg.into();
-            self.pc = self.pc + arg;
-        }
+        self.pc = self.pc.wrapping_add_signed(arg_signed.into());
     }
     pub fn load_memory_byte_lo(&mut self, addr: u16) {
         // TODO: insert code for peripherals

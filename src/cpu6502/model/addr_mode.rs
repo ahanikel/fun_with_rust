@@ -25,11 +25,34 @@ impl super::IsOriginal for AddrMode {
         match self {
             AddrMode::AbsoluteIndexedIndirect => false,
             AddrMode::ZeroPageIndirect => false,
+            AddrMode::ZeroPageRelative => false,
             _ => true,
         }
     }
 }
 
+impl AddrMode {
+    pub fn get_cycles(&self) -> u8 {
+        match self {
+            AddrMode::Absolute => 4,
+            AddrMode::AbsoluteIndexedIndirect => 6,
+            AddrMode::AbsoluteIndexedWithX => 4,
+            AddrMode::AbsoluteIndexedWithY => 4,
+            AddrMode::AbsoluteIndirect => 6,
+            AddrMode::Accumulator => 2,
+            AddrMode::Immediate => 2,
+            AddrMode::Implied => 2,
+            AddrMode::Relative => 2,
+            AddrMode::ZeroPage => 3,
+            AddrMode::ZeroPageIndexedIndirect => 6,
+            AddrMode::ZeroPageIndexedWithX => 4,
+            AddrMode::ZeroPageIndexedWithY => 4,
+            AddrMode::ZeroPageIndirect => 5,
+            AddrMode::ZeroPageIndirectIndexedWithY => 5,
+            AddrMode::ZeroPageRelative => 3,
+        }
+    }
+}
 impl CPU {
     pub fn stack_push_byte(&mut self) {
         self._stack_push_byte(false);
@@ -179,16 +202,20 @@ impl CPU {
      */
     pub fn load_absolute_indexed_with_x_byte(&mut self) {
         self.load_addr_arg();
+        let old_addr = self.tmp_addr;
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
         self.load_memory_byte_lo(self.tmp_addr);
-    }
+        self.inc_cycles_if_page_boundary_crossed(old_addr);
+   }
      /**
      * Loads a byte from a,y
      */
     pub fn load_absolute_indexed_with_y_byte(&mut self) {
         self.load_addr_arg();
+        let old_addr = self.tmp_addr;
         self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
         self.load_memory_byte_lo(self.tmp_addr);
+        self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
     /**
      * Loads a byte from the (zp,x) address in the argument
@@ -211,8 +238,11 @@ impl CPU {
      * Load a byte from the (zp),y address in the argument
      */
     pub fn load_zp_indirect_indexed_with_y_byte(&mut self) {
-        self.load_zp_indirect_byte();
-        self.tmp[0] = self.tmp[0] + self.y;
+        self.load_zp_arg();
+        self.load_memory_addr(self.tmp_addr);
+        let old_addr = self.tmp_addr;
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+        self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
     /**
      * Load a byte from the zp address in the argument
@@ -232,10 +262,15 @@ impl CPU {
     /**
      * Load a byte from the zp,y address in the argument
      */
-     pub fn load_zp_indexed_with_y_byte(&mut self) {
+    pub fn load_zp_indexed_with_y_byte(&mut self) {
         self.load_zp_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
         self.load_memory_byte_lo(self.tmp_addr);
+    }
+    fn inc_cycles_if_page_boundary_crossed(&mut self, old_addr: u16) {
+        if self.tmp_addr & 0xff00 != old_addr & 0xff00 {
+            self.cycles = self.cycles + 1;
+        }
     }
 }
  
