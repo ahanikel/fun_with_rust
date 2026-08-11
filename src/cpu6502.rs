@@ -60,24 +60,29 @@ impl CPU {
                 }
                 _ => {
                     self.cycle = self.cycle + 1;
-                    println!("(Reset)");
+                    println!("{}", &self.status_line);
                     return;
                 }
             }
         }
         let opcode = self.mem[usize::from(self.pc)];
-        println!(
-            "{}: 0b{:08b} 0x{:04x} 0x{:02x}",
-            self.cycle, self.st.0, self.pc, opcode
-        );
-        if self.cycle == self.cycles {
-            self.cycle = 0;
-            self.cycles = 0;
+        if self.cycle == 0 {
+            self.status_line = format!(
+                "0b{:08b} 0x{:04x} 0x{:02x}",
+                self.st.0, self.pc, opcode
+            );
+            println!("0: {}", &self.status_line);
             let (inst, mode) = instruction_and_mode(opcode);
+            self.cycles = 0;
             self.run_load(mode);
             self.run_instruction(inst);
             self.run_store(inst, mode);
+            self.cycle = self.cycle + 1;
+        } else if self.cycle == self.cycles - 1 {
+            println!("{}: {}", self.cycle, &self.status_line);
+            self.cycle = 0;
         } else {
+            println!("{}: {}", self.cycle, &self.status_line);
             self.cycle = self.cycle + 1;
         }
     }
@@ -101,6 +106,7 @@ impl CPU {
             AddrMode::ZeroPageIndirectIndexedWithY => self.load_zp_indirect_indexed_with_y_byte(),
             AddrMode::ZeroPageRelative => self.load_zp_byte(),
         }
+        self.cycles = self.cycles + mode.get_cycles();
     }
 
     fn run_instruction(&mut self, inst: Instruction) {
@@ -187,6 +193,7 @@ impl CPU {
             Instruction::BRA => self.tmp[0] = 1,
             Instruction::BRK => {
                 if self.is_set(StatusFlag::BRK) {
+                    self.inc_pc(2);
                 } else {
                     self.stack_push_pc(2);
                     self.stack_push_flags();
@@ -194,6 +201,9 @@ impl CPU {
                         &[StatusFlag::BRK, StatusFlag::IRQDisable],
                         &[StatusFlag::Decimal],
                     );
+                    self.load_memory_addr(0xfffe);
+                    self.cycles = 7;
+                    self.pc = self.tmp_addr;
                 }
             }
             Instruction::BVC => {
@@ -252,6 +262,7 @@ impl CPU {
             Instruction::JSR => {
                 self.stack_push_pc(3);
                 self.load_addr_arg();
+                self.cycles = 6;
                 self.set_pc();
             }
             Instruction::LDA => {
@@ -407,8 +418,46 @@ impl CPU {
     }
 
     fn run_store(&mut self, inst: Instruction, mode: AddrMode) {
-        self.cycles = self.cycles + mode.get_cycles();
         match (inst, mode) {
+            (
+                Instruction::ASL
+                | Instruction::DEC
+                | Instruction::INC
+                | Instruction::LSR
+                | Instruction::ROL
+                | Instruction::ROR,
+                AddrMode::Absolute | AddrMode::AbsoluteIndexedWithX,
+            ) => {
+                self.store_memory_byte(self.tmp_addr, self.tmp[0]);
+                self.cycles = self.cycles + 2;
+                self.inc_pc(3);
+            }
+            (
+                Instruction::ASL
+                | Instruction::DEC
+                | Instruction::INC
+                | Instruction::LSR
+                | Instruction::ROL
+                | Instruction::ROR,
+                AddrMode::ZeroPage | AddrMode::ZeroPageIndexedWithX,
+            ) => {
+                self.store_memory_byte(self.tmp_addr, self.tmp[0]);
+                self.cycles = self.cycles + 2;
+                self.inc_pc(2);
+            }
+            (
+                Instruction::ASL
+                | Instruction::DEC
+                | Instruction::INC
+                | Instruction::LSR
+                | Instruction::ROL
+                | Instruction::ROR,
+                AddrMode::Accumulator,
+            ) => {
+                self.a = self.tmp[0];
+                self.inc_pc(1);
+            }
+            (Instruction::JSR, AddrMode::Absolute) => {}
             (_, AddrMode::Absolute) => self.inc_pc(3),
             (_, AddrMode::AbsoluteIndexedIndirect) => self.inc_pc(3),
             (Instruction::STA, AddrMode::AbsoluteIndexedWithX) => {
@@ -420,6 +469,9 @@ impl CPU {
             (_, AddrMode::AbsoluteIndirect) => self.inc_pc(3),
             (_, AddrMode::Accumulator) => self.inc_pc(1),
             (_, AddrMode::Immediate) => self.inc_pc(2),
+            (Instruction::BRK, AddrMode::Implied) => {}
+            (Instruction::RTI, AddrMode::Implied) => {}
+            (Instruction::RTS, AddrMode::Implied) => {}
             (_, AddrMode::Implied) => self.inc_pc(1),
             (_, AddrMode::Relative) => {
                 let take_branch = self.tmp[0] != 0;

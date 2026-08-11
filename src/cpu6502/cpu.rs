@@ -17,6 +17,7 @@ pub struct CPU {
     pub reset: bool,
     pub tmp: [u8; 2],
     pub tmp_addr: u16,
+    pub status_line: String,
 }
 
 impl CPU {
@@ -39,6 +40,7 @@ impl CPU {
             reset: false,
             tmp: [0, 0],
             tmp_addr: 0,
+            status_line: "".to_owned(),
         }
     }
     pub fn reset(&mut self) {
@@ -51,6 +53,7 @@ impl CPU {
         self.cycle = 0;
         self.cycles = 0;
         self.reset = true;
+        self.status_line = "(Reset)".to_owned();
     }
     pub fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) {
         self.set_flags(enable);

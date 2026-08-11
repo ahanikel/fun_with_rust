@@ -9,10 +9,27 @@ fn test_brk_rti() {
     cpu.mem[0xfffe] = 0xee;
     cpu.mem[0xffff] = 0xee;
     cpu.mem[0xeef0] = 0x40; // RTI
-    for step in 0..36 {
+    for step in 0..14 {
         print!("Step {step}: ");
         cpu.step();
     }
+    assert!(cpu.is_set(StatusFlag::BRK));
+    assert!(cpu.is_set(StatusFlag::IRQDisable));
+    assert_eq!(0xeeee, cpu.pc);
+    for step in 14..16 {
+        print!("Step {step}: ");
+        cpu.step();
+    }
+    assert!(cpu.is_set(StatusFlag::BRK));
+    assert!(cpu.is_set(StatusFlag::IRQDisable));
+    assert_eq!(0xeef0, cpu.pc);
+    for step in 16..18 {
+        print!("Step {step}: ");
+        cpu.step();
+    }
+    assert!(cpu.is_clear(StatusFlag::BRK));
+    assert!(cpu.is_clear(StatusFlag::IRQDisable));
+    assert_eq!(0x0002, cpu.pc);
 }
 
 #[test]
@@ -25,14 +42,20 @@ fn test_jsr_ret() {
     cpu.mem[0xccce] = 0xdd;
     cpu.mem[0xdddd] = 0x60; // RTS
     cpu.reset();
-    for step in 0..36 {
+    for step in 0..13 {
         print!("Step {step}: ");
         cpu.step();
     }
+    assert_eq!(0xdddd, cpu.pc);
+    for step in 13..15 {
+        print!("Step {step}: ");
+        cpu.step();
+    }
+    assert_eq!(0xcccf, cpu.pc);
 }
 
 #[test]
-fn test_beq() {
+fn test_beq_taken() {
     let mut cpu = CPU::new();
     cpu.mem[0xfffc] = 0xaa;
     cpu.mem[0xfffd] = 0xaa;
@@ -40,10 +63,29 @@ fn test_beq() {
     cpu.mem[0xaaab] = 0xc0;
     cpu.reset();
     cpu.set_flag(StatusFlag::Zero);
-    for step in 0..36 {
+    for step in 0..10 {
         print!("Step {step}: ");
         cpu.step();
     }
+    assert_eq!(0, cpu.cycle);
+    assert_eq!(0xaa6a, cpu.pc);
+}
+
+#[test]
+fn test_beq_not_taken() {
+    let mut cpu = CPU::new();
+    cpu.mem[0xfffc] = 0xaa;
+    cpu.mem[0xfffd] = 0xaa;
+    cpu.mem[0xaaaa] = 0xf0; // BEQ
+    cpu.mem[0xaaab] = 0xc0;
+    cpu.reset();
+    cpu.clear_flag(StatusFlag::Zero);
+    for step in 0..9 {
+        print!("Step {step}: ");
+        cpu.step();
+    }
+    assert_eq!(0, cpu.cycle);
+    assert_eq!(0xaaac, cpu.pc);
 }
 
 #[test]
@@ -58,7 +100,8 @@ fn test_cmp_zpx_ind_lt() {
     cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
     cpu.mem[0x1001] = 0x4f;
     cpu.mem[0x9999] = 0xf0;
-    for _step in 0..15 {
+    for step in 0..13 {
+        print!("Step {step}: ");
         cpu.step();
     }
     assert!(cpu.is_set(StatusFlag::Negative));
@@ -78,7 +121,8 @@ fn test_cmp_zpx_ind_eq() {
     cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
     cpu.mem[0x1001] = 0x4f;
     cpu.mem[0x9999] = 0x55;
-    for _step in 0..15 {
+    for step in 0..13 {
+        print!("Step {step}: ");
         cpu.step();
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
@@ -98,7 +142,8 @@ fn test_cmp_zpx_ind_gt() {
     cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
     cpu.mem[0x1001] = 0x4f;
     cpu.mem[0x9999] = 0x55;
-    for _step in 0..15 {
+    for step in 0..13 {
+        print!("Step {step}: ");
         cpu.step();
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
