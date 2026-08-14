@@ -269,3 +269,39 @@ pub fn instruction_and_mode(opcode: u8) -> (Instruction, AddrMode) {
         (Instruction::BBS7, AddrMode::ZeroPageRelative),
     ][opcode]
 }
+
+pub fn disasm(pc: u16, mem: &[u8]) -> String {
+    match instruction_and_mode(mem[0]) {
+        (inst, AddrMode::Absolute) => {
+            format!("{} ${:04X}", inst, u16::from_le_bytes([mem[1], mem[2]]))
+        }
+        (inst, AddrMode::AbsoluteIndexedIndirect) => {
+            format!("{} (${:04X},X)", inst, u16::from_le_bytes([mem[1], mem[2]]))
+        }
+        (inst, AddrMode::AbsoluteIndexedWithX) => {
+            format!("{} ${:04X},X", inst, u16::from_le_bytes([mem[1], mem[2]]))
+        }
+        (inst, AddrMode::AbsoluteIndexedWithY) => {
+            format!("{} ${:04X},Y", inst, u16::from_le_bytes([mem[1], mem[2]]))
+        }
+        (inst, AddrMode::AbsoluteIndirect) => {
+            format!("{} (${:04X})", inst, u16::from_le_bytes([mem[1], mem[2]]))
+        }
+        (inst, AddrMode::Accumulator) => format!("{} #${:02X}", inst, mem[1]),
+        (inst, AddrMode::Immediate) => format!("{} #${:02X}", inst, mem[1]),
+        (inst, AddrMode::Implied) => format!("{}", inst),
+        (inst, AddrMode::Relative) => format!(
+            "{} ${:04X}",
+            inst,
+            pc.wrapping_add(2)
+                .wrapping_add_signed(mem[1].cast_signed().into())
+        ),
+        (inst, AddrMode::ZeroPage) => format!("{} ${:02X}", inst, mem[1]),
+        (inst, AddrMode::ZeroPageIndexedIndirect) => format!("{} (${:02X},X)", inst, mem[1]),
+        (inst, AddrMode::ZeroPageIndexedWithX) => format!("{} ${:02X},X", inst, mem[1]),
+        (inst, AddrMode::ZeroPageIndexedWithY) => format!("{} ${:02X},Y", inst, mem[1]),
+        (inst, AddrMode::ZeroPageIndirect) => format!("{} (${:02X})", inst, mem[1]),
+        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${}),Y", inst, mem[1]),
+        (inst, AddrMode::ZeroPageRelative) => format!("{} #${:02X} ${:02X}", inst, mem[1], mem[2]),
+    }
+}

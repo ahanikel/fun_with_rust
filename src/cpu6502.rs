@@ -65,12 +65,21 @@ impl CPU {
                 }
             }
         }
+        if self.cycle == 0 && self.irq && !self.irq_prev {
+            if self.is_clear(StatusFlag::IRQDisable) {
+                self.stack_push_pc(2);
+                self.stack_push_flags();
+                self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
+                self.load_memory_addr(0xfffe);
+                self.cycles = 7;
+                self.pc = self.tmp_addr;
+                return;
+            }
+        }
         let opcode = self.mem[usize::from(self.pc)];
         if self.cycle == 0 {
-            self.status_line = format!(
-                "0b{:08b} 0x{:04x} 0x{:02x}",
-                self.st.0, self.pc, opcode
-            );
+            let pc: usize = self.pc.into();
+            self.status_line = format!("0b{:08b} 0x{:04X} {}", self.st.0, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
             println!("0: {}", &self.status_line);
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;

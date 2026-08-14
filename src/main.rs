@@ -1,3 +1,5 @@
+use std::{env::args, io::Read};
+
 use crate::cpu6502::{
     cpu::CPU,
     model::{
@@ -11,19 +13,15 @@ mod cpu6502;
 mod heap;
 
 fn main() {
+    let image = args().next().unwrap_or("/Users/axel/src/lispos8/build/lispos8.bin".to_string());
     _run_heap();
     let mut cpu: CPU = CPU::new();
+    let mut f = std::fs::File::open(image).expect("Give a file of a memory image as the first argument");
+    f.read_exact(&mut cpu.mem[32768..]).unwrap();
     cpu.reset();
-    cpu.step();
-    println!(
-        "{} (Absolute {} original)",
-        Instruction::LDA.desc(),
-        if AddrMode::Absolute.is_original() {
-            "is"
-        } else {
-            "is not"
-        }
-    );
+    loop {
+        cpu.step();
+    }
 }
 
 fn _run_heap() {
