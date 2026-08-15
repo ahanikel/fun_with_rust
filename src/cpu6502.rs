@@ -82,7 +82,7 @@ impl CPU {
         if self.cycle == 0 {
             let pc: usize = self.pc.into();
             self.status_line = format!("0b{:08b} 0x{:04X} {}", self.st.0, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
-            println!("0: {}", &self.status_line);
+            //println!("0: {}", &self.status_line);
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;
             self.run_load(inst, mode);
@@ -289,7 +289,6 @@ impl CPU {
                 self.check_and_set_nz_flags(self.y);
             }
             Instruction::JMP => {
-                self.load_addr_arg();
                 self.set_pc();
             }
             Instruction::JSR => {
@@ -490,7 +489,8 @@ impl CPU {
                 self.a = self.tmp[0];
                 self.inc_pc(1);
             }
-            (Instruction::JSR, AddrMode::Absolute) => {}
+            (Instruction::JSR, _) => {}
+            (Instruction::JMP, _) => {}
             (_, AddrMode::Absolute) => self.inc_pc(3),
             (_, AddrMode::AbsoluteIndexedIndirect) => self.inc_pc(3),
             (Instruction::STA, AddrMode::AbsoluteIndexedWithX) => {
@@ -510,11 +510,10 @@ impl CPU {
                 let take_branch = self.tmp[0] != 0;
                 self.load_byte_arg();
                 let old_pc = self.pc;
+                self.inc_pc(2);
                 if take_branch {
                     self.inc_pc(self.tmp[0]);
                     self.cycles = self.cycles + 1;
-                } else {
-                    self.inc_pc(2)
                 }
                 if old_pc & 0xff00 != self.pc & 0xff00 {
                     self.cycles = self.cycles + 1;

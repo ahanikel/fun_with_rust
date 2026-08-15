@@ -288,7 +288,7 @@ pub fn disasm(pc: u16, mem: &[u8]) -> String {
         (inst, AddrMode::AbsoluteIndirect) => {
             format!("{} (${:04X})", inst, u16::from_le_bytes([mem[1], mem[2]]))
         }
-        (inst, AddrMode::Accumulator) => format!("{} #${:02X}", inst, mem[1]),
+        (inst, AddrMode::Accumulator) => format!("{}", inst),
         (inst, AddrMode::Immediate) => format!("{} #${:02X}", inst, mem[1]),
         (inst, AddrMode::Implied) => format!("{}", inst),
         (inst, AddrMode::Relative) => format!(
