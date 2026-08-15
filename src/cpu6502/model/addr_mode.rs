@@ -181,21 +181,32 @@ impl CPU {
         self.load_absolute_word();
         self.tmp_addr = u16::from_le_bytes(self.tmp);
     }
+    pub fn load_absolute_indirect_addr(&mut self) {
+        self.load_absolute_addr();
+        self.load_memory_addr(self.tmp_addr);
+    }
     /**
      * Loads a byte from (abs)
      */
     pub fn load_absolute_indirect_byte(&mut self) {
-        self.load_absolute_addr();
+        self.load_absolute_indirect_addr();
         self.load_memory_byte_lo(self.tmp_addr);
     }
+    pub fn load_absolute_indexed_indirect_addr(&mut self) {
+        self.load_addr_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        self.load_memory_addr(self.tmp_addr);
+     }
     /**
      * Loads a byte from (abs,x)
      */
     pub fn load_absolute_indexed_indirect_byte(&mut self) {
+        self.load_absolute_indexed_indirect_addr();
+        self.load_memory_byte_lo(self.tmp_addr);
+    }
+    pub fn load_absolute_indexed_with_x_addr(&mut self) {
         self.load_addr_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
-        self.load_memory_addr(self.tmp_addr);
-        self.load_memory_byte_lo(self.tmp_addr);
     }
     /**
      * Loads a byte from abs,x
@@ -207,6 +218,10 @@ impl CPU {
         self.load_memory_byte_lo(self.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
    }
+    pub fn load_absolute_indexed_with_y_addr(&mut self) {
+        self.load_addr_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+     }
      /**
      * Loads a byte from a,y
      */
@@ -217,23 +232,34 @@ impl CPU {
         self.load_memory_byte_lo(self.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
+    pub fn load_zp_indexed_indirect_addr(&mut self) {
+        self.load_zp_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        self.load_memory_addr(self.tmp_addr);
+    }
     /**
      * Loads a byte from the (zp,x) address in the argument
      */
     pub fn load_zp_indexed_indirect_byte(&mut self) {
-        self.load_zp_arg();
-        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
-        self.load_memory_addr(self.tmp_addr);
+        self.load_zp_indexed_indirect_addr();
         self.load_memory_byte_lo(self.tmp_addr);
+    }
+    pub fn load_zp_indirect_addr(&mut self) {
+        self.load_zp_arg();
+        self.load_memory_addr(self.tmp_addr);
     }
     /**
      * Load a byte from the (zp) address in the argument
      */
     pub fn load_zp_indirect_byte(&mut self) {
-        self.load_zp_arg();
-        self.load_memory_addr(self.tmp_addr);
+        self.load_zp_indirect_addr();
         self.load_memory_byte_lo(self.tmp_addr);
     }
+    pub fn load_zp_indirect_indexed_with_y_addr(&mut self) {
+        self.load_zp_arg();
+        self.load_memory_addr(self.tmp_addr);
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+     }
     /**
      * Load a byte from the (zp),y address in the argument
      */
@@ -242,6 +268,7 @@ impl CPU {
         self.load_memory_addr(self.tmp_addr);
         let old_addr = self.tmp_addr;
         self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+        self.load_memory_byte_lo(self.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
     /**
@@ -251,20 +278,26 @@ impl CPU {
         self.load_zp_arg();
         self.load_memory_byte_lo(self.tmp_addr);
     }
+     pub fn load_zp_indexed_with_x_addr(&mut self) {
+        self.load_zp_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+     }
     /**
      * Load a byte from the zp,x address in the argument
      */
      pub fn load_zp_indexed_with_x_byte(&mut self) {
-        self.load_zp_arg();
-        self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
+        self.load_zp_indexed_with_x_addr();
         self.load_memory_byte_lo(self.tmp_addr);
+    }
+    pub fn load_zp_indexed_with_y_addr(&mut self) {
+        self.load_zp_arg();
+        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
     }
     /**
      * Load a byte from the zp,y address in the argument
      */
     pub fn load_zp_indexed_with_y_byte(&mut self) {
-        self.load_zp_arg();
-        self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
+        self.load_zp_indexed_with_y_addr();
         self.load_memory_byte_lo(self.tmp_addr);
     }
     fn inc_cycles_if_page_boundary_crossed(&mut self, old_addr: u16) {

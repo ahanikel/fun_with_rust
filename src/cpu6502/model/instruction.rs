@@ -103,6 +103,7 @@ pub enum Instruction {
     ILL,
 }
 
+#[allow(unused)]
 pub trait HasDescription {
     fn desc(&self) -> &str;
 }

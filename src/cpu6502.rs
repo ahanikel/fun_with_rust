@@ -1,5 +1,7 @@
 pub mod cpu;
 pub mod model;
+pub mod acia;
+pub mod device;
 mod test;
 
 use cpu::{CPU, StatusFlag};
@@ -83,37 +85,59 @@ impl CPU {
             println!("0: {}", &self.status_line);
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;
-            self.run_load(mode);
+            self.run_load(inst, mode);
             self.run_instruction(inst);
             self.run_store(inst, mode);
             self.cycle = self.cycle + 1;
         } else if self.cycle == self.cycles - 1 {
-            println!("{}: {}", self.cycle, &self.status_line);
+            //println!("{}: {}", self.cycle, &self.status_line);
             self.cycle = 0;
         } else {
-            println!("{}: {}", self.cycle, &self.status_line);
+            //println!("{}: {}", self.cycle, &self.status_line);
             self.cycle = self.cycle + 1;
         }
     }
 
-    fn run_load(&mut self, mode: AddrMode) {
-        match mode {
-            AddrMode::Absolute => self.load_absolute_byte(),
-            AddrMode::AbsoluteIndexedIndirect => self.load_absolute_indexed_indirect_byte(),
-            AddrMode::AbsoluteIndexedWithX => self.load_absolute_indexed_with_x_byte(),
-            AddrMode::AbsoluteIndexedWithY => self.load_absolute_indexed_with_y_byte(),
-            AddrMode::AbsoluteIndirect => self.load_absolute_indirect_byte(),
-            AddrMode::Accumulator => self.tmp[0] = self.a,
-            AddrMode::Immediate => self.load_byte_arg(),
-            AddrMode::Implied => {}
-            AddrMode::Relative => {}
-            AddrMode::ZeroPage => self.load_zp_byte(),
-            AddrMode::ZeroPageIndexedIndirect => self.load_zp_indexed_indirect_byte(),
-            AddrMode::ZeroPageIndexedWithX => self.load_zp_indexed_with_x_byte(),
-            AddrMode::ZeroPageIndexedWithY => self.load_zp_indexed_with_y_byte(),
-            AddrMode::ZeroPageIndirect => self.load_zp_indirect_byte(),
-            AddrMode::ZeroPageIndirectIndexedWithY => self.load_zp_indirect_indexed_with_y_byte(),
-            AddrMode::ZeroPageRelative => self.load_zp_byte(),
+    fn run_load(&mut self, inst: Instruction, mode: AddrMode) {
+        match (inst, mode) {
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::Absolute) => self.load_addr_arg(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPage) => self.load_zp_arg(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPageIndexedIndirect) => self.load_zp_indexed_indirect_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPageIndirect) => self.load_zp_indirect_addr(),
+            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+             AddrMode::ZeroPageIndirectIndexedWithY) => self.load_zp_indirect_indexed_with_y_addr(),
+            (_, AddrMode::Absolute) => self.load_absolute_byte(),
+            (_, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_byte(),
+            (_, AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_byte(),
+            (_, AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_byte(),
+            (_, AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_byte(),
+            (_, AddrMode::Accumulator) => self.tmp[0] = self.a,
+            (_, AddrMode::Immediate) => self.load_byte_arg(),
+            (_, AddrMode::Implied) => {}
+            (_, AddrMode::Relative) => {}
+            (_, AddrMode::ZeroPage) => self.load_zp_byte(),
+            (_, AddrMode::ZeroPageIndexedIndirect) => self.load_zp_indexed_indirect_byte(),
+            (_, AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_byte(),
+            (_, AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_byte(),
+            (_, AddrMode::ZeroPageIndirect) => self.load_zp_indirect_byte(),
+            (_, AddrMode::ZeroPageIndirectIndexedWithY) => self.load_zp_indirect_indexed_with_y_byte(),
+            (_, AddrMode::ZeroPageRelative) => self.load_zp_byte(),
         }
         self.cycles = self.cycles + mode.get_cycles();
     }

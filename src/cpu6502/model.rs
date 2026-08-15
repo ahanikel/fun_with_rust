@@ -4,6 +4,7 @@ pub mod instruction;
 use addr_mode::AddrMode;
 use instruction::Instruction;
 
+#[allow(unused)]
 pub trait IsOriginal {
     fn is_original(&self) -> bool;
 }
