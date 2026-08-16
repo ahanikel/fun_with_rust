@@ -53,7 +53,7 @@ impl AddrMode {
         }
     }
 }
-impl CPU {
+impl CPU<'_> {
     pub fn stack_push_byte(&mut self) {
         self._stack_push_byte(false);
     }

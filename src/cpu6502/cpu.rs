@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::cpu6502::device::Device;
 
-pub struct CPU {
+pub struct CPU<'a> {
     pub a: u8,
     pub x: u8,
     pub y: u8,
@@ -23,9 +23,10 @@ pub struct CPU {
     pub tmp: [u8; 2],
     pub tmp_addr: u16,
     pub status_line: String,
+    pub log_instructions: Option<&'a mut dyn FnMut(&str)>,
 }
 
-impl CPU {
+impl CPU<'_> {
     pub fn new() -> Self {
         let mem: [u8; 65536] = [0; 65536];
         CPU {
@@ -47,6 +48,7 @@ impl CPU {
             tmp: [0, 0],
             tmp_addr: 0,
             status_line: "".to_owned(),
+            log_instructions: None,
         }
     }
     pub fn reset(&mut self) {

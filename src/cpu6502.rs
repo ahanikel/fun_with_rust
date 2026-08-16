@@ -7,7 +7,7 @@ mod test;
 use cpu::{CPU, StatusFlag};
 use model::{addr_mode::AddrMode, instruction::Instruction, instruction_and_mode};
 
-impl CPU {
+impl CPU<'_> {
     fn compare_and_set_flags(&mut self, reg: u8, byte: u8) {
         match reg.cmp(&byte) {
             std::cmp::Ordering::Less => self.change_flags(
@@ -62,7 +62,6 @@ impl CPU {
                 }
                 _ => {
                     self.cycle = self.cycle + 1;
-                    println!("{}", &self.status_line);
                     return;
                 }
             }
@@ -81,8 +80,10 @@ impl CPU {
         let opcode = self.mem[usize::from(self.pc)];
         if self.cycle == 0 {
             let pc: usize = self.pc.into();
-            self.status_line = format!("0b{:08b} 0x{:04X} {}", self.st.0, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
-            //println!("0: {}", &self.status_line);
+            self.status_line = format!("0b{:08b} a:{} x:{} y:{} 0x{:04X} {}", self.st.0, self.a, self.x, self.y, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
+            if let Some(logger) = &mut self.log_instructions {
+                logger(&self.status_line);
+            }
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;
             self.run_load(inst, mode);
@@ -90,10 +91,8 @@ impl CPU {
             self.run_store(inst, mode);
             self.cycle = self.cycle + 1;
         } else if self.cycle == self.cycles - 1 {
-            //println!("{}: {}", self.cycle, &self.status_line);
             self.cycle = 0;
         } else {
-            //println!("{}: {}", self.cycle, &self.status_line);
             self.cycle = self.cycle + 1;
         }
     }

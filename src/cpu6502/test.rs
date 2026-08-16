@@ -1,6 +1,7 @@
-#[cfg(test)]
+mod it;
 
-use super::*;
+#[cfg(test)]
+use crate::cpu6502::*;
 
 #[test]
 fn test_brk_rti() {
