@@ -14,8 +14,10 @@ fn setup_cpu<'a>(log_output: Option<Rc<RefCell<dyn FnMut(&str)>>>, log_instructi
     cpu.log_instructions = log_instructions;
     let mut f = std::fs::File::open(image).unwrap();
     f.read_exact(&mut cpu.mem[32768..]).unwrap();
-    //let acia: Acia<'a> = Acia::new(log_output);
-    let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(Acia::new(log_output)));
+    let s: String = String::from("fff0.ffff\r\n");
+    let mut acia = Acia::new(log_output);
+    acia.set_input(&s);
+    let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
     for addr in 0x5000..=0x5003 {
         cpu.register_device(addr, acia.clone());
     }
@@ -48,10 +50,7 @@ fn run_cpu_with_timing(cpu: &mut CPU, no_cycles: u32) {
             let expected = Duration::from_micros(cpu.cycles.into());
             if elapsed < expected {
                 let wait_for = expected - elapsed;
-                //eprintln!("Sleeping for {}µs", wait_for.as_micros());
                 std::thread::sleep(wait_for);
-            } else {
-                //eprintln!("Took {}µs for {} cycles", elapsed.as_micros(), cpu.cycles);
             }
             now = std::time::Instant::now();
             elapsed = Duration::default();
@@ -74,5 +73,5 @@ fn test_input() {
     let mut cpu = setup_cpu(Some(Rc::new(RefCell::new(out_fn))), Some(&mut log_fn));
     run_cpu(&mut cpu, 50000);
     assert_eq!("\r\nStarting Wozmon...\r\n\\\r\n".to_owned(), out.take());
-    println!("\nOutput was: {}", out.borrow());
+    println!("{:?}", &cpu.mem[0x300..0x320]);
 }

@@ -14,6 +14,12 @@ impl Acia {
         let input = VecDeque::new();
         Self { input, command: 0, control: 0, log_output }
     }
+    pub fn set_input(&mut self, s: &str) {
+        for c in s.chars() {
+            let byte: u8 = c.try_into().unwrap_or(b'?');
+            self.input.push_back(byte);
+        }
+    }
 }
 
 impl Device for Acia {
@@ -23,7 +29,7 @@ impl Device for Acia {
             let _ = std::io::stdin().read_line(&mut s);
             s = s.trim_end().to_string();
             s += "\r\n";
-            string_into_buffer(&s, &mut self.input);
+            self.set_input(&s);
         }
         match reg {
             0 => self.input.pop_front().unwrap_or(b'?'),
@@ -50,9 +56,3 @@ impl Device for Acia {
     }
 }
 
-fn string_into_buffer(s: &String, buf: &mut VecDeque<u8>) {
-    for c in s.chars() {
-        let byte: u8 = c.try_into().unwrap_or(b'?');
-        buf.push_back(byte);
-    }
-}
