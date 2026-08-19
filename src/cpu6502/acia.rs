@@ -24,6 +24,7 @@ impl Acia {
 
 impl Device for Acia {
     fn read(&mut self, reg: u8) -> u8 {
+        /*
         if self.input.is_empty() {
             let mut s = String::new();
             let _ = std::io::stdin().read_line(&mut s);
@@ -31,6 +32,7 @@ impl Device for Acia {
             s += "\r\n";
             self.set_input(&s);
         }
+        */
         match reg {
             0 => self.input.pop_front().unwrap_or(b'?'),
             // status bit 4: tx data reg empty (always in our case); bit 3: rx data reg full
