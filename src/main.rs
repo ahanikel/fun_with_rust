@@ -1,49 +1,43 @@
-use std::{cell::RefCell, io::Read, rc::Rc, thread::sleep, time::Duration};
-
-use crate::cpu6502::{
-    cpu::CPU,
-    device::Device,
+use std::{
+    cell::RefCell,
+    io::{Read, Write},
+    rc::Rc,
 };
+
+use crate::cpu6502::{acia::Acia, cpu::CPU, device::Device};
 
 mod cpu6502;
 mod heap;
 
 fn main() {
-    let image = "test-resources/test-image";
     _run_heap();
+    let log1 = Rc::new(RefCell::new(String::new()));
+    let log = log1.clone();
+    let mut log_fn = |s: &str| {
+        log.borrow_mut().push_str(s);
+        log.borrow_mut().push('\n');
+    };
+    let out_fn = |b: u8| {
+        if b == b'\r' {
+            std::io::stdout().write(&[b'\n']).unwrap(); // Wozmon uses \r for line breaks
+        } else {
+            std::io::stdout().write(&[b]).unwrap();
+        }
+        std::io::stdout().flush().unwrap();
+    };
     let mut cpu: CPU = CPU::new();
-    let mut f = std::fs::File::open(image).expect("Give a file of a memory image as the first argument");
+    cpu.log_instructions = Some(&mut log_fn);
+    let image = "test-resources/test-image";
+    let mut f = std::fs::File::open(image).unwrap();
     f.read_exact(&mut cpu.mem[32768..]).unwrap();
-    let acia = cpu6502::acia::Acia::new(None);
+    let acia = Acia::new(Some(Rc::new(RefCell::new(out_fn))));
     let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
-    cpu.register_device(0x5000, acia.clone());
-    cpu.register_device(0x5001, acia.clone());
-    cpu.register_device(0x5002, acia.clone());
-    cpu.register_device(0x5003, acia);
+    for addr in 0x5000..=0x5003 {
+        cpu.register_device(addr, acia.clone());
+    }
     cpu.reset();
-    let mut now = std::time::Instant::now();
-    let mut elapsed = Duration::default();
-    let mut last_irq = std::time::Instant::now();
     loop {
-        cpu.irq = false;
-        if cpu.cycle == 0 && (std::time::Instant::now() - last_irq > Duration::from_millis(50)) {
-            cpu.irq = true;
-            last_irq = std::time::Instant::now(); 
-        }
         cpu.step();
-        elapsed += std::time::Instant::now() - now;
-        if cpu.cycle < cpu.cycles && cpu.cycle == cpu.cycles - 1 {
-            let expected = Duration::from_micros(cpu.cycles.into());
-            if elapsed < expected {
-                let wait_for = expected - elapsed;
-                //eprintln!("Sleeping for {}µs", wait_for.as_micros());
-                sleep(wait_for);
-            } else {
-                //eprintln!("Took {}µs for {} cycles", elapsed.as_micros(), cpu.cycles);
-            }
-            now = std::time::Instant::now();
-            elapsed = Duration::default();
-        }
     }
 }
 
