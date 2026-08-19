@@ -26,7 +26,6 @@ fn main() {
     let mut last_irq = std::time::Instant::now();
     loop {
         cpu.irq = false;
-        cpu.irq_prev = false;
         if cpu.cycle == 0 && (std::time::Instant::now() - last_irq > Duration::from_millis(50)) {
             cpu.irq = true;
             last_irq = std::time::Instant::now(); 

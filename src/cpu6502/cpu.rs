@@ -14,11 +14,7 @@ pub struct CPU<'a> {
     pub mem: [u8; 65536],
     pub devices: HashMap<u16, Rc<RefCell<dyn Device>>>,
     pub irq: bool,      // true if the IRQB pin is set to low
-    #[allow(unused)]
-    pub irq_prev: bool, // previous state of the IRQB pin to detect negative transition
     pub nmi: bool,      // true if the NMIB pin is set to low
-    #[allow(unused)]
-    pub nmi_prev: bool, // previous state of the NMIB pin to detect negative transition
     pub reset: bool,
     pub tmp: [u8; 2],
     pub tmp_addr: u16,
@@ -41,9 +37,7 @@ impl CPU<'_> {
             mem,
             devices: HashMap::new(),
             irq: false,
-            irq_prev: false,
             nmi: false,
-            nmi_prev: false,
             reset: false,
             tmp: [0, 0],
             tmp_addr: 0,
@@ -150,7 +144,6 @@ pub struct StatusFlags(pub(crate) u8);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StatusFlag {
-    None,
     Carry,
     Zero,
     IRQDisable,
@@ -160,26 +153,9 @@ pub enum StatusFlag {
     Negative,
 }
 
-impl From<u8> for StatusFlag {
-    fn from(value: u8) -> Self {
-        let value: usize = value.into();
-        [
-            Self::None,
-            Self::Carry,
-            Self::Zero,
-            Self::IRQDisable,
-            Self::Decimal,
-            Self::BRK,
-            Self::Overflow,
-            Self::Negative,
-        ][value]
-    }
-}
-
 impl Into<u8> for StatusFlag {
     fn into(self) -> u8 {
         match self {
-            StatusFlag::None => 0,
             StatusFlag::Carry => 1,
             StatusFlag::Zero => 2,
             StatusFlag::IRQDisable => 4,

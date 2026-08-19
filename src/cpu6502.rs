@@ -66,7 +66,7 @@ impl CPU<'_> {
                 }
             }
         }
-        if self.cycle == 0 && self.irq && !self.irq_prev {
+        if self.cycle == 0 && self.irq {
             if self.is_clear(StatusFlag::IRQDisable) {
                 self.stack_push_pc(2);
                 self.stack_push_flags();
@@ -74,13 +74,14 @@ impl CPU<'_> {
                 self.load_memory_addr(0xfffe);
                 self.cycles = 7;
                 self.pc = self.tmp_addr;
+                self.irq = false;
                 return;
             }
         }
         let opcode = self.mem[usize::from(self.pc)];
         if self.cycle == 0 {
             let pc: usize = self.pc.into();
-            self.status_line = format!("0b{:08b} a:{} x:{} y:{} 0x{:04X} {}", self.st.0, self.a, self.x, self.y, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
+            self.status_line = format!("0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}", self.st.0, self.a, self.x, self.y, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
             if let Some(logger) = &mut self.log_instructions {
                 logger(&self.status_line);
             }
