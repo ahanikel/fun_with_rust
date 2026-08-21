@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, io::Read, rc::Rc};
 
 use crate::cpu6502::device::Device;
 
+#[allow(clippy::type_complexity)]
 pub struct Acia {
     input: VecDeque<u8>,
     stdin_enabled: bool,
@@ -10,6 +11,7 @@ pub struct Acia {
     log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>,
 }
 
+#[allow(clippy::type_complexity)]
 impl Acia {
     pub fn new(log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>) -> Self {
         let input = VecDeque::new();
@@ -21,10 +23,16 @@ impl Acia {
             log_output,
         }
     }
+    #[cfg(test)]
     pub fn set_input(&mut self, s: &str) {
         for c in s.chars() {
             let byte: u8 = c.try_into().unwrap_or(b'?');
-            self.input.push_back(byte);
+            if byte >= b'a' && byte <= b'z' {
+                let b = b'A' + (byte - b'a');
+                self.input.push_back(b);
+            } else {
+                self.input.push_back(byte);
+            }
         }
         self.stdin_enabled = false;
     }
@@ -48,10 +56,10 @@ impl Device for Acia {
             0 => self.input.pop_front().unwrap_or(b'?'),
             // status bit 4: tx data reg empty (always in our case); bit 3: rx data reg full
             1 => {
-                if self.input.len() > 0 {
-                    0b00011000
-                } else {
+                if self.input.is_empty() {
                     0b00010000
+                } else {
+                    0b00011000
                 }
             }
             2 => self.command,

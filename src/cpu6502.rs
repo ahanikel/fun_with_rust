@@ -1,7 +1,7 @@
-pub mod cpu;
-pub mod model;
 pub mod acia;
+pub mod cpu;
 pub mod device;
+pub mod model;
 mod test;
 
 use cpu::{CPU, StatusFlag};
@@ -61,27 +61,33 @@ impl CPU<'_> {
                     self.cycle = 0;
                 }
                 _ => {
-                    self.cycle = self.cycle + 1;
+                    self.cycle += 1;
                     return;
                 }
             }
         }
-        if self.cycle == 0 && self.irq {
-            if self.is_clear(StatusFlag::IRQDisable) {
-                self.stack_push_pc(2);
-                self.stack_push_flags();
-                self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
-                self.load_memory_addr(0xfffe);
-                self.cycles = 7;
-                self.pc = self.tmp_addr;
-                self.irq = false;
-                return;
-            }
+        if self.cycle == 0 && self.irq && self.is_clear(StatusFlag::IRQDisable) {
+            self.stack_push_pc(2);
+            self.stack_push_flags();
+            self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
+            self.load_memory_addr(0xfffe);
+            self.cycles = 7;
+            self.pc = self.tmp_addr;
+            self.irq = false;
+            return;
         }
         let opcode = self.mem[usize::from(self.pc)];
         if self.cycle == 0 {
             let pc: usize = self.pc.into();
-            self.status_line = format!("0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}", self.st.0, self.a, self.x, self.y, self.pc, model::disasm(self.pc, &self.mem[pc..pc+3]));
+            self.status_line = format!(
+                "0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}",
+                self.st.0,
+                self.a,
+                self.x,
+                self.y,
+                self.pc,
+                model::disasm(self.pc, &self.mem[pc..pc + 3])
+            );
             if let Some(logger) = &mut self.log_instructions {
                 logger(&self.status_line);
             }
@@ -90,38 +96,60 @@ impl CPU<'_> {
             self.run_load(inst, mode);
             self.run_instruction(inst);
             self.run_store(inst, mode);
-            self.cycle = self.cycle + 1;
+            self.cycle += 1;
         } else if self.cycle == self.cycles - 1 {
             self.cycle = 0;
         } else {
-            self.cycle = self.cycle + 1;
+            self.cycle += 1;
         }
     }
 
     fn run_load(&mut self, inst: Instruction, mode: AddrMode) {
         match (inst, mode) {
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::Absolute) => self.load_addr_arg(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPage) => self.load_zp_arg(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPageIndexedIndirect) => self.load_zp_indexed_indirect_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPageIndirect) => self.load_zp_indirect_addr(),
-            (Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
-             AddrMode::ZeroPageIndirectIndexedWithY) => self.load_zp_indirect_indexed_with_y_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::Absolute,
+            ) => self.load_addr_arg(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::AbsoluteIndexedIndirect,
+            ) => self.load_absolute_indexed_indirect_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::AbsoluteIndexedWithX,
+            ) => self.load_absolute_indexed_with_x_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::AbsoluteIndexedWithY,
+            ) => self.load_absolute_indexed_with_y_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::AbsoluteIndirect,
+            ) => self.load_absolute_indirect_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPage,
+            ) => self.load_zp_arg(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPageIndexedIndirect,
+            ) => self.load_zp_indexed_indirect_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPageIndexedWithX,
+            ) => self.load_zp_indexed_with_x_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPageIndexedWithY,
+            ) => self.load_zp_indexed_with_y_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPageIndirect,
+            ) => self.load_zp_indirect_addr(),
+            (
+                Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
+                AddrMode::ZeroPageIndirectIndexedWithY,
+            ) => self.load_zp_indirect_indexed_with_y_addr(),
             (_, AddrMode::Absolute) => self.load_absolute_byte(),
             (_, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_byte(),
             (_, AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_byte(),
@@ -136,40 +164,45 @@ impl CPU<'_> {
             (_, AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_byte(),
             (_, AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_byte(),
             (_, AddrMode::ZeroPageIndirect) => self.load_zp_indirect_byte(),
-            (_, AddrMode::ZeroPageIndirectIndexedWithY) => self.load_zp_indirect_indexed_with_y_byte(),
+            (_, AddrMode::ZeroPageIndirectIndexedWithY) => {
+                self.load_zp_indirect_indexed_with_y_byte()
+            }
             (_, AddrMode::ZeroPageRelative) => self.load_zp_byte(),
         }
-        self.cycles = self.cycles + mode.get_cycles();
+        self.cycles += mode.get_cycles();
     }
 
     fn run_instruction(&mut self, inst: Instruction) {
         match inst {
             Instruction::ADC => {
-                // add the two numbers
+                // add the accumulator and the argument
                 let a = self.a;
                 let b = self.tmp[0];
-                let res = a.wrapping_add(b);
+                let c = a.wrapping_add(b);
+
                 // An overflow occurs if and only if two numbers with the same sign are added,
                 // but the result has the opposite sign:
-                let ofl1 = (a ^ res) & (b ^ res) & 0x80 != 0;
+                let ofl1 = (a ^ c) & (b ^ c) & 0x80 != 0;
 
                 // add the carry
-                let a = res;
-                let b: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
-                let res = a.wrapping_add(b);
-                let ofl2 = (a ^ res) & (b ^ res) & 0x80 != 0;
+                let d: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
+                self.a = c.wrapping_add(d);
+                let ofl2 = (c ^ self.a) & (d ^ self.a) & 0x80 != 0;
+
+                // we set the overflow flag iff one occurred during either addition
                 self.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
 
-                self.check_and_set_nz_flags(res);
-                self.a = res;
+                // we set the carry flag iff the result is smaller than the first operand
+                self.set_or_clear_flag(StatusFlag::Carry, self.a < a);
+                self.check_and_set_nz_flags(self.a);
             }
             Instruction::AND => {
-                self.a = self.a & self.tmp[0];
+                self.a &= self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
             }
             Instruction::ASL => {
                 self.set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x80 != 0);
-                self.tmp[0] = self.tmp[0] << 1;
+                self.tmp[0] <<= 1;
                 self.check_and_set_nz_flags(self.tmp[0]);
             }
             Instruction::BBR0 => self.tmp[0] = !(self.tmp[0] & 0x01),
@@ -180,14 +213,14 @@ impl CPU<'_> {
             Instruction::BBR5 => self.tmp[0] = !(self.tmp[0] & 0x20),
             Instruction::BBR6 => self.tmp[0] = !(self.tmp[0] & 0x40),
             Instruction::BBR7 => self.tmp[0] = !(self.tmp[0] & 0x80),
-            Instruction::BBS0 => self.tmp[0] = self.tmp[0] & 0x01,
-            Instruction::BBS1 => self.tmp[0] = self.tmp[0] & 0x02,
-            Instruction::BBS2 => self.tmp[0] = self.tmp[0] & 0x04,
-            Instruction::BBS3 => self.tmp[0] = self.tmp[0] & 0x08,
-            Instruction::BBS4 => self.tmp[0] = self.tmp[0] & 0x10,
-            Instruction::BBS5 => self.tmp[0] = self.tmp[0] & 0x20,
-            Instruction::BBS6 => self.tmp[0] = self.tmp[0] & 0x40,
-            Instruction::BBS7 => self.tmp[0] = self.tmp[0] & 0x80,
+            Instruction::BBS0 => self.tmp[0] &= 0x01,
+            Instruction::BBS1 => self.tmp[0] &= 0x02,
+            Instruction::BBS2 => self.tmp[0] &= 0x04,
+            Instruction::BBS3 => self.tmp[0] &= 0x08,
+            Instruction::BBS4 => self.tmp[0] &= 0x10,
+            Instruction::BBS5 => self.tmp[0] &= 0x20,
+            Instruction::BBS6 => self.tmp[0] &= 0x40,
+            Instruction::BBS7 => self.tmp[0] &= 0x80,
             Instruction::BCC => {
                 self.tmp[0] = if self.is_clear(StatusFlag::Carry) {
                     1
@@ -273,7 +306,7 @@ impl CPU<'_> {
                 self.check_and_set_nz_flags(self.y);
             }
             Instruction::EOR => {
-                self.a = self.a ^ self.tmp[0];
+                self.a ^= self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
             }
             Instruction::INC => {
@@ -311,11 +344,11 @@ impl CPU<'_> {
             }
             Instruction::LSR => {
                 self.check_and_set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x1);
-                self.tmp[0] = self.tmp[0] >> 1;
+                self.tmp[0] >>= 1;
             }
             Instruction::NOP => {}
             Instruction::ORA => {
-                self.a = self.a | self.tmp[0];
+                self.a |= self.tmp[0];
                 self.check_and_set_nz_flags(self.a);
             }
             Instruction::PHA => {
@@ -358,16 +391,16 @@ impl CPU<'_> {
             Instruction::ROL => {
                 let old_carry = self.is_set(StatusFlag::Carry);
                 self.check_and_set_or_clear_flag(StatusFlag::Carry, self.tmp[0] & 0x80);
-                self.tmp[0] = self.tmp[0] << 1;
-                self.tmp[0] = self.tmp[0] | if old_carry { 1 } else { 0 };
+                self.tmp[0] <<= 1;
+                self.tmp[0] |= if old_carry { 1 } else { 0 };
             }
             Instruction::ROR => {
                 let old_carry = self.is_set(StatusFlag::Carry);
                 let b0 = self.tmp[0] & 1;
                 self.check_and_set_or_clear_flag(StatusFlag::Carry, b0);
-                self.tmp[0] = self.tmp[0] >> 1;
+                self.tmp[0] >>= 1;
                 if old_carry {
-                    self.tmp[0] = self.tmp[0] | 0x80;
+                    self.tmp[0] |= 0x80;
                 }
                 self.check_and_set_nz_flags(self.tmp[0]);
             }
@@ -383,21 +416,26 @@ impl CPU<'_> {
             Instruction::SBC => {
                 // add the accumulator and the complement of the argument
                 let a = self.a;
-                let b = !self.tmp[0];
-                let res = a.wrapping_add(b);
-                // An overflow occurs if and only if two numbers with the same sign are added,
-                // but the result has the opposite sign:
-                let ofl1 = (a ^ res) & (b ^ res) & 0x80 != 0;
+                let b = self.tmp[0];
+                let c = a.wrapping_add(!b);
 
-                // add the carry
-                let a = res;
-                let b: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
-                let res = a.wrapping_add(b);
-                let ofl2 = (a ^ res) & (b ^ res) & 0x80 != 0;
+                // An overflow occurs if and only if two numbers with different sign are subtracted,
+                // and the result has the opposite sign of the first number:
+                let ofl1 = (a ^ b) & (a ^ c) & 0x80 != 0;
+
+                // Add the carry
+                let d: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
+                self.a = c.wrapping_add(d);
+                let ofl2 = (c ^ d) & (c ^ self.a) & 0x80 != 0;
+
+                // We set the overflow flag iff an overflow occurred on either the additions
                 self.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
 
-                self.check_and_set_nz_flags(res);
-                self.a = res;
+                // A borrow occurs if a < b, i.e. if the result of the unsigned subtraction would
+                // be negative. In other words the unsigned result would be bigger than a.
+                // We clear the carry flag when a borrow occurs.
+                self.set_or_clear_flag(StatusFlag::Carry, self.a < a);
+                self.check_and_set_nz_flags(self.a);
             }
             Instruction::SEC => self.set_flag(StatusFlag::Carry),
             Instruction::SED => self.set_flag(StatusFlag::Decimal),
@@ -461,7 +499,7 @@ impl CPU<'_> {
                 AddrMode::Absolute | AddrMode::AbsoluteIndexedWithX,
             ) => {
                 self.store_memory_byte(self.tmp_addr, self.tmp[0]);
-                self.cycles = self.cycles + 2;
+                self.cycles += 2;
                 self.inc_pc(3);
             }
             (
@@ -474,7 +512,7 @@ impl CPU<'_> {
                 AddrMode::ZeroPage | AddrMode::ZeroPageIndexedWithX,
             ) => {
                 self.store_memory_byte(self.tmp_addr, self.tmp[0]);
-                self.cycles = self.cycles + 2;
+                self.cycles += 2;
                 self.inc_pc(2);
             }
             (
@@ -494,7 +532,7 @@ impl CPU<'_> {
             (_, AddrMode::Absolute) => self.inc_pc(3),
             (_, AddrMode::AbsoluteIndexedIndirect) => self.inc_pc(3),
             (Instruction::STA, AddrMode::AbsoluteIndexedWithX) => {
-                self.cycles = self.cycles + 1;
+                self.cycles += 1;
                 self.inc_pc(3);
             }
             (_, AddrMode::AbsoluteIndexedWithX) => self.inc_pc(3),
@@ -513,10 +551,10 @@ impl CPU<'_> {
                 self.inc_pc(2);
                 if take_branch {
                     self.inc_pc(self.tmp[0]);
-                    self.cycles = self.cycles + 1;
+                    self.cycles += 1;
                 }
                 if old_pc & 0xff00 != self.pc & 0xff00 {
-                    self.cycles = self.cycles + 1;
+                    self.cycles += 1;
                 }
             }
             (_, AddrMode::ZeroPage) => self.inc_pc(2),

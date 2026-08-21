@@ -66,7 +66,7 @@ impl CPU<'_> {
     }
     pub fn set_flag(&mut self, flag: StatusFlag) {
         let flag: u8 = flag.into();
-        self.st.0 = self.st.0 | flag;
+        self.st.0 |= flag;
     }
     pub fn set_flags(&mut self, flags: &[StatusFlag]) {
         for flag in flags {
@@ -75,7 +75,7 @@ impl CPU<'_> {
     }
     pub fn clear_flag(&mut self, flag: StatusFlag) {
         let flag: u8 = flag.into();
-        self.st.0 = self.st.0 & !flag;
+        self.st.0 &= !flag;
     }
     pub fn clear_flags(&mut self, flags: &[StatusFlag]) {
         for flag in flags {

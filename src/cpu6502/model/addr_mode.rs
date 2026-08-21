@@ -1,6 +1,6 @@
 use crate::cpu6502::cpu::CPU;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AddrMode {
     Absolute,
     AbsoluteIndexedIndirect,
@@ -22,12 +22,12 @@ pub enum AddrMode {
 
 impl super::IsOriginal for AddrMode {
     fn is_original(&self) -> bool {
-        match self {
-            AddrMode::AbsoluteIndexedIndirect => false,
-            AddrMode::ZeroPageIndirect => false,
-            AddrMode::ZeroPageRelative => false,
-            _ => true,
-        }
+        !matches!(
+            self,
+            AddrMode::AbsoluteIndexedIndirect
+                | AddrMode::ZeroPageIndirect
+                | AddrMode::ZeroPageRelative
+        )
     }
 }
 
@@ -79,23 +79,15 @@ impl CPU<'_> {
         self.stack_push_word();
     }
     fn _stack_push_byte(&mut self, hi: bool) {
-        let byte = self.tmp[if hi {1} else {0}];
+        let byte = self.tmp[if hi { 1 } else { 0 }];
         let stack_base: u16 = 0x100;
         let addr: u16 = self.sp.into();
         let addr = stack_base + addr;
         self.store_memory_byte(addr, byte);
-        if self.sp == 0 {
-            self.sp = 0xff;
-        } else {
-            self.sp = self.sp - 1;
-        }
+        self.sp = self.sp.wrapping_sub(1)
     }
     fn _stack_pull_byte(&mut self, hi: bool) {
-        if self.sp == 0xff {
-            self.sp = 0x00;
-        } else {
-            self.sp = self.sp + 1;
-        }
+        self.sp = self.sp.wrapping_add(1);
         let stack_base: u16 = 0x100;
         let addr: u16 = self.sp.into();
         let addr = stack_base + addr;
@@ -196,7 +188,7 @@ impl CPU<'_> {
         self.load_addr_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
         self.load_memory_addr(self.tmp_addr);
-     }
+    }
     /**
      * Loads a byte from (abs,x)
      */
@@ -217,12 +209,12 @@ impl CPU<'_> {
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
         self.load_memory_byte_lo(self.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
-   }
+    }
     pub fn load_absolute_indexed_with_y_addr(&mut self) {
         self.load_addr_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
-     }
-     /**
+    }
+    /**
      * Loads a byte from a,y
      */
     pub fn load_absolute_indexed_with_y_byte(&mut self) {
@@ -259,7 +251,7 @@ impl CPU<'_> {
         self.load_zp_arg();
         self.load_memory_addr(self.tmp_addr);
         self.tmp_addr = self.tmp_addr.wrapping_add(self.y.into());
-     }
+    }
     /**
      * Load a byte from the (zp),y address in the argument
      */
@@ -278,14 +270,14 @@ impl CPU<'_> {
         self.load_zp_arg();
         self.load_memory_byte_lo(self.tmp_addr);
     }
-     pub fn load_zp_indexed_with_x_addr(&mut self) {
+    pub fn load_zp_indexed_with_x_addr(&mut self) {
         self.load_zp_arg();
         self.tmp_addr = self.tmp_addr.wrapping_add(self.x.into());
-     }
+    }
     /**
      * Load a byte from the zp,x address in the argument
      */
-     pub fn load_zp_indexed_with_x_byte(&mut self) {
+    pub fn load_zp_indexed_with_x_byte(&mut self) {
         self.load_zp_indexed_with_x_addr();
         self.load_memory_byte_lo(self.tmp_addr);
     }
@@ -302,8 +294,7 @@ impl CPU<'_> {
     }
     fn inc_cycles_if_page_boundary_crossed(&mut self, old_addr: u16) {
         if self.tmp_addr & 0xff00 != old_addr & 0xff00 {
-            self.cycles = self.cycles + 1;
+            self.cycles += 1;
         }
     }
 }
- 

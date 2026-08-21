@@ -19,9 +19,9 @@ fn main() {
     };
     let out_fn = |b: u8| {
         if b == b'\r' {
-            std::io::stdout().write(&[b'\n']).unwrap(); // Wozmon uses \r for line breaks
+            std::io::stdout().write_all(b"\n").unwrap(); // Wozmon uses \r for line breaks
         } else {
-            std::io::stdout().write(&[b]).unwrap();
+            std::io::stdout().write_all(&[b]).unwrap();
         }
         std::io::stdout().flush().unwrap();
     };
@@ -48,7 +48,7 @@ fn _run_heap() {
         let alloc = heap.malloc(1);
         assert!(alloc.is_ok());
         let alloc = alloc.unwrap();
-        assert!(alloc % 4 == 0);
+        assert!(alloc.is_multiple_of(4));
         allocs.push(alloc);
     }
     for alloc in allocs.iter().rev() {
