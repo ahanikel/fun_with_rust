@@ -231,9 +231,9 @@ impl CPU<'_> {
             Instruction::BCS => self.tmp[0] = if self.is_set(StatusFlag::Carry) { 1 } else { 0 },
             Instruction::BEQ => self.tmp[0] = if self.is_set(StatusFlag::Zero) { 1 } else { 0 },
             Instruction::BIT => {
-                let test = self.a & self.tmp[0];
-                self.check_and_set_nz_flags(test);
-                self.check_and_set_or_clear_flag(StatusFlag::Overflow, test & 0x40);
+                self.check_and_set_z_flag(self.a & self.tmp[0]);
+                self.check_and_set_n_flag(self.tmp[0]);
+                self.check_and_set_or_clear_flag(StatusFlag::Overflow, self.tmp[0] & 0x40);
             }
             Instruction::BMI => {
                 self.tmp[0] = if self.is_set(StatusFlag::Negative) {

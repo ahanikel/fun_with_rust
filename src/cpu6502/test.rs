@@ -1,6 +1,4 @@
 #![cfg(test)]
-mod it;
-
 use crate::cpu6502::model::addr_mode::AddrMode::Relative;
 use crate::cpu6502::model::opcode_from_instruction_and_mode;
 use crate::cpu6502::*;
@@ -567,3 +565,31 @@ fn test_cmp_sbc_2() {
     assert!(cpu.is_set(StatusFlag::Negative));
     assert_eq!(0xffc1, cpu.pc);
 }
+
+#[test]
+fn test_bit() {
+    let mut cpu = CPU::new();
+    let prog = [
+        opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
+        0x74,
+        opcode_from_instruction_and_mode(Instruction::STA, AddrMode::ZeroPage),
+        0x2b,
+        opcode_from_instruction_and_mode(Instruction::BIT, AddrMode::ZeroPage),
+        0x2b,
+        opcode_from_instruction_and_mode(Instruction::BVC, Relative),
+        0x10,
+    ];
+    cpu.reset();
+    cpu.pc = 0xff70;
+    for (pos, b) in prog.iter().enumerate() {
+        cpu.mem[0xff70 + pos] = *b;
+    }
+    for step in 0..17 {
+        println!("Step {step}: {}", cpu.status_line);
+        cpu.step();
+    }
+    assert!(cpu.is_set(StatusFlag::Overflow));
+    assert_eq!(0xff78, cpu.pc);
+}
+
+mod it;

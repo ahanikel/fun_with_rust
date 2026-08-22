@@ -140,3 +140,10 @@ fn test_5() {
     let output = "\\\n0.2\n\n0000: 00 00 00\n";
     test_input_output(input, output);
 }
+
+#[test]
+fn test_6() {
+    let input = "3000: aa ab\r";
+    let output = "\\\n3000: AA AB\n\n3000: 00\n";
+    test_input_output(input, output);
+}
