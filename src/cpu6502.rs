@@ -417,24 +417,22 @@ impl CPU<'_> {
                 // add the accumulator and the complement of the argument
                 let a = self.a;
                 let b = self.tmp[0];
-                let c = a.wrapping_add(!b);
+                let c = a.wrapping_sub(b);
+                let mut borrow = c > a;
+
+                // Add the carry
+                let d: u8 = if self.is_set(StatusFlag::Carry) { 0 } else { 1 };
+                self.a = c.wrapping_sub(d);
+                borrow |= self.a > c;
 
                 // An overflow occurs if and only if two numbers with different sign are subtracted,
                 // and the result has the opposite sign of the first number:
-                let ofl1 = (a ^ b) & (a ^ c) & 0x80 != 0;
+                let ofl = (a ^ b) & (a ^ self.a) & 0x80 != 0;
+                self.set_or_clear_flag(StatusFlag::Overflow, ofl);
 
-                // Add the carry
-                let d: u8 = if self.is_set(StatusFlag::Carry) { 1 } else { 0 };
-                self.a = c.wrapping_add(d);
-                let ofl2 = (c ^ d) & (c ^ self.a) & 0x80 != 0;
-
-                // We set the overflow flag iff an overflow occurred on either the additions
-                self.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
-
-                // A borrow occurs if a < b, i.e. if the result of the unsigned subtraction would
-                // be negative. In other words the unsigned result would be bigger than a.
                 // We clear the carry flag when a borrow occurs.
-                self.set_or_clear_flag(StatusFlag::Carry, self.a < a);
+                //self.set_or_clear_flag(StatusFlag::Carry, self.a <= a);
+                self.set_or_clear_flag(StatusFlag::Carry, !borrow);
                 self.check_and_set_nz_flags(self.a);
             }
             Instruction::SEC => self.set_flag(StatusFlag::Carry),

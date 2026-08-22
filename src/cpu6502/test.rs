@@ -1,6 +1,7 @@
 #![cfg(test)]
 mod it;
 
+use crate::cpu6502::model::addr_mode::AddrMode::Relative;
 use crate::cpu6502::model::opcode_from_instruction_and_mode;
 use crate::cpu6502::*;
 
@@ -153,9 +154,20 @@ fn test_cmp_zpx_ind_gt() {
     assert!(cpu.is_set(StatusFlag::Carry));
 }
 
-fn _test_sbc(a: u8, b: u8, carry: bool, expected_res: u8, expected_overflow: bool, expected_carry: bool) {
+fn _test_sbc(
+    a: u8,
+    b: u8,
+    carry: bool,
+    expected_res: u8,
+    expected_overflow: bool,
+    expected_carry: bool,
+) {
     let mut cpu = CPU::new();
-    let carry_inst = if carry { Instruction::SEC } else { Instruction::CLC };
+    let carry_inst = if carry {
+        Instruction::SEC
+    } else {
+        Instruction::CLC
+    };
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         a,
@@ -303,8 +315,13 @@ fn test_sbc_6() {
  * We compute 6 - 3.
  */
 fn test_sbc_7() {
-    _test_sbc(6,3, true, 3, false, true);
-    _test_sbc(6,3, false, 2, false, true);
+    _test_sbc(6, 3, true, 3, false, true);
+    _test_sbc(6, 3, false, 2, false, true);
+}
+
+#[test]
+fn test_sbc_8() {
+    _test_sbc(0, 0, true, 0, false, true);
 }
 
 fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_carry: bool) {
@@ -412,7 +429,7 @@ fn test_adc_4() {
  * Signed perspective: -3 + 5 = 2.
  *   The result fits well within the -128 to +127 range.
  *   No overflow (overflow = 0)
-  */
+ */
 fn test_adc_5() {
     _test_adc((-3_i8).cast_unsigned(), 5, 2, false, true);
 }
@@ -426,7 +443,7 @@ fn test_adc_5() {
  * Signed perspective: 126 + 123 = 249.
  *   The result does not fit within the -128 to +127 range.
  *   Overflow occurs (overflow = 1)
-  */
+ */
 fn test_adc_6() {
     _test_adc(126, 123, 249, true, false);
 }
@@ -437,5 +454,116 @@ fn test_adc_6() {
  * We compute 6 + 3.
  */
 fn test_adc_7() {
-    _test_adc(6,3, 9, false, false);
+    _test_adc(6, 3, 9, false, false);
+}
+
+#[test]
+/*
+Test a: (0024: 00 00) (0028: 00 00)
+FFB7 A5 24     LDA $24       |00 00 01 FF|000110|3
+FFB9 C5 28     CMP $28       |00 00 01 FF|000111|3
+FFBB A5 25     LDA $25       |00 00 01 FF|000111|3
+FFBD E5 29     SBC $29       |00 00 01 FF|000111|3
+FFBF B0 C1     BCS $FF82     |00 00 01 FF|000111|3
+FF82 ...
+*/
+
+/*
+Test b: (0024: 00 00) (0028: 02 00)
+FFB7 A5 24     LDA $24       |00 00 03 FF|000111|3
+FFB9 C5 28     CMP $28       |00 00 03 FF|100100|3
+FFBB A5 25     LDA $25       |00 00 03 FF|000110|3
+FFBD E5 29     SBC $29       |FF 00 03 FF|100100|3
+FFBF B0 C1     BCS $FF82     |FF 00 03 FF|100100|2
+FFC1 ...
+ */
+fn test_cmp_sbc_1() {
+    for mem_0x28 in [0, 2] {
+        let mut cpu = CPU::new();
+        let prog = [
+            opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
+            0x24,
+            opcode_from_instruction_and_mode(Instruction::CMP, AddrMode::ZeroPage),
+            0x28,
+            opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
+            0x25,
+            opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::ZeroPage),
+            0x29,
+            opcode_from_instruction_and_mode(Instruction::BCS, Relative),
+            0xc1,
+        ];
+        cpu.reset();
+        cpu.pc = 0xffb7;
+        for (pos, b) in prog.iter().enumerate() {
+            cpu.mem[0xffb7 + pos] = *b;
+        }
+        cpu.mem[0x0024] = 0;
+        cpu.mem[0x0025] = 0;
+        cpu.mem[0x0028] = mem_0x28;
+        cpu.mem[0x0029] = 0;
+        for step in 0..21 {
+            cpu.step();
+            println!("Step {step}: {}", cpu.status_line);
+        }
+        match mem_0x28 {
+            0 => {
+                cpu.step();
+                println!("Step 21: {}", cpu.status_line);
+                assert!(cpu.is_set(StatusFlag::Carry));
+                assert!(cpu.is_set(StatusFlag::Zero));
+                assert!(cpu.is_clear(StatusFlag::Negative));
+                assert_eq!(0xff82, cpu.pc);
+            }
+            2 => {
+                assert!(cpu.is_clear(StatusFlag::Carry));
+                assert!(cpu.is_clear(StatusFlag::Zero));
+                assert!(cpu.is_set(StatusFlag::Negative));
+                assert_eq!(0xffc1, cpu.pc);
+            }
+            _ => {} // can't happen
+        }
+    }
+}
+
+#[test]
+/*
+FFB7 A5 24     LDA $24       |00 00 00 FF|000110|3
+FFB9 C5 28     CMP $28       |00 00 00 FF|100100|3
+FFBB A5 25     LDA $25       |FF 00 00 FF|100100|3
+FFBD E5 29     SBC $29       |FF 00 00 FF|100100|3
+FFBF B0 C1     BCS $FF82     |FF 00 00 FF|100100|2
+FFC1 ...
+
+*/
+fn test_cmp_sbc_2() {
+    let mut cpu = CPU::new();
+    let prog = [
+        opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
+        0x24,
+        opcode_from_instruction_and_mode(Instruction::CMP, AddrMode::ZeroPage),
+        0x28,
+        opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
+        0x25,
+        opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::ZeroPage),
+        0x29,
+        opcode_from_instruction_and_mode(Instruction::BCS, Relative),
+        0xc1,
+    ];
+    cpu.reset();
+    cpu.pc = 0xffb7;
+    for (pos, b) in prog.iter().enumerate() {
+        cpu.mem[0xffb7 + pos] = *b;
+    }
+    cpu.mem[0x0024] = 0x00;
+    cpu.mem[0x0025] = 0xff;
+    cpu.mem[0x0028] = 0x01;
+    cpu.mem[0x0029] = 0xff;
+    for step in 0..21 {
+        println!("Step {step}: {}", cpu.status_line);
+        cpu.step();
+    }
+    assert!(cpu.is_clear(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Negative));
+    assert_eq!(0xffc1, cpu.pc);
 }

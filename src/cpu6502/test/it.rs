@@ -102,7 +102,7 @@ fn test_input_output(input: &str, output: &str) {
         let mut log_file = std::fs::File::create("/tmp/asm.log").unwrap();
         log_file.write_all(log.as_bytes()).unwrap();
     }
-    assert_eq!(input.as_bytes().to_ascii_uppercase(), &cpu.mem[0x200..=0x209]);
+    assert_eq!(input.as_bytes().to_ascii_uppercase(), &cpu.mem[0x200..0x200+input.len()]);
     assert_eq!(output, &out);
 }
 
@@ -124,5 +124,19 @@ fn test_2() {
 fn test_3() {
     let input = "01ff.0200\r";
     let output = "\\\n01FF.0200\n\n01FF: FF\n0200: 30\n";
+    test_input_output(input, output);
+}
+
+#[test]
+fn test_4() {
+    let input = "feff.ff01\r";
+    let output = "\\\nFEFF.FF01\n\nFEFF: 00\nFF00: A9 1B\n";
+    test_input_output(input, output);
+}
+
+#[test]
+fn test_5() {
+    let input = "0.2\r";
+    let output = "\\\n0.2\n\n0000: 00 00 00\n";
     test_input_output(input, output);
 }
