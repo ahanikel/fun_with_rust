@@ -2,11 +2,13 @@ use std::{
     cell::RefCell,
     io::{Read, Write},
     rc::Rc,
+    sync::mpsc::channel,
+    time::Duration,
 };
 
 use crate::{
     cpu6502::{acia::Acia, cpu::CPU, device::Device},
-    video::Video,
+    video::{Video, VideoMsg},
 };
 
 mod cpu6502;
@@ -15,38 +17,42 @@ mod video;
 
 fn main() {
     _run_heap();
-    let _cpu_thread = std::thread::spawn(|| {
-        let log1 = Rc::new(RefCell::new(String::new()));
-        let log = log1.clone();
-        let mut log_fn = |s: &str| {
-            log.borrow_mut().push_str(s);
-            log.borrow_mut().push('\n');
-        };
-        let out_fn = |b: u8| {
-            if b == b'\r' {
-                std::io::stdout().write_all(b"\n").unwrap(); // Wozmon uses \r for line breaks
-            } else {
-                std::io::stdout().write_all(&[b]).unwrap();
-            }
-            std::io::stdout().flush().unwrap();
-        };
-        let mut cpu: CPU = CPU::new();
-        cpu.log_instructions = Some(&mut log_fn);
-        let image = "test-resources/test-image";
-        let mut f = std::fs::File::open(image).unwrap();
-        f.read_exact(&mut cpu.mem[32768..]).unwrap();
-        let acia = Acia::new(Some(Rc::new(RefCell::new(out_fn))));
-        let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
-        for addr in 0x5000..=0x5003 {
-            cpu.register_device(addr, acia.clone());
+    let log1 = Rc::new(RefCell::new(String::new()));
+    let log = log1.clone();
+    let mut log_fn = |s: &str| {
+        log.borrow_mut().push_str(s);
+        log.borrow_mut().push('\n');
+    };
+    let out_fn = |b: u8| {
+        if b == b'\r' {
+            std::io::stdout().write_all(b"\n").unwrap(); // Wozmon uses \r for line breaks
+        } else {
+            std::io::stdout().write_all(&[b]).unwrap();
         }
-        cpu.reset();
-        loop {
-            cpu.step();
-        }
-    });
-    let mut video = Video::default();
+        std::io::stdout().flush().unwrap();
+    };
+    let mut cpu: CPU = CPU::new();
+    cpu.log_instructions = Some(&mut log_fn);
+    let image = "test-resources/test-image";
+    let mut f = std::fs::File::open(image).unwrap();
+    f.read_exact(&mut cpu.mem[32768..]).unwrap();
+    let acia = Acia::new(Some(Rc::new(RefCell::new(out_fn))));
+    let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
+    for addr in 0x5000..=0x5003 {
+        cpu.register_device(addr, acia.clone());
+    }
+    cpu.reset();
+    let (sender, receiver) = channel();
+    let mut video = Video::new(sender);
     video.run();
+    loop {
+        cpu.step(); // ascending flank
+        video.step(); // descending flank
+        match receiver.recv_timeout(Duration::ZERO) {
+            Ok(VideoMsg::Quit) => break,
+            _ => {}
+        }
+    }
 }
 
 fn _run_heap() {

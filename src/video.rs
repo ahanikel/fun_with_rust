@@ -1,7 +1,7 @@
 mod char_rom;
 mod control;
 
-use std::sync::Arc;
+use std::sync::{Arc, mpsc::Sender};
 
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::{
@@ -20,25 +20,82 @@ use winit::{
  *  D800-DBE7 Color RAM (1000 bytes)
  *  DBE8-DBFF unused
  */
-#[derive(Default)]
-pub struct Video {}
+pub struct Video<'a> {
+    main_app: Sender<VideoMsg>,
+    screen: Screen<'a>,
+    cycle: u16,
+}
 
-impl Video {
+impl Video<'_> {
+    pub fn new(main_app: Sender<VideoMsg>) -> Self {
+        let screen = Screen::default();
+        Video { main_app, screen, cycle: 0 }
+    }
     pub fn run(&mut self) {
         let ev_loop = EventLoop::new().unwrap();
         ev_loop.set_control_flow(Poll);
-        let mut screen = Screen::default();
+        let mut screen = Screen::new();
         ev_loop.run_app(&mut screen).unwrap();
+        let _ = self.main_app.send(VideoMsg::Quit);
+    }
+    pub fn step(&mut self) {
+        if self.cycle == 49999 {
+            self.screen.redraw();
+            self.cycle = 0;
+        } else {
+            self.cycle += 1;
+        }
     }
 }
 
-#[derive(Default)]
+pub enum VideoMsg {
+    Quit,
+}
+
 pub struct Screen<'a> {
     pixels: Option<Pixels<'a>>,
+    window: Option<Arc<winit::window::Window>>,
 }
 
 const WIDTH: u32 = 403;
 const HEIGHT: u32 = 284;
+
+impl Default for Screen<'_> {
+    fn default() -> Self {
+        Screen::new()
+    }
+}
+
+impl<'a> Screen<'a> {
+    pub fn new() -> Self {
+        Screen {
+            pixels: None,
+            window: None,
+        }
+    }
+    pub fn redraw(&self) {
+        if let Some(w) = self.window.as_ref() {
+            w.request_redraw();
+        }
+    }
+    fn do_redraw(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(pixels) = self.pixels.as_mut() {
+            let frame = pixels.frame_mut();
+            for (_i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+                //let x = (i % WIDTH as usize) as u8;
+                //let y = (i / WIDTH as usize) as u8;
+                // RGBA color assignment: C64 blue background
+                //pixel.copy_from_slice(&[0x40, 0x40, 0xe0, 0xff]);
+                pixel.copy_from_slice(&C64_PALETTE[C64Colour::Blue as usize]);
+                println!("frame chunk: {_i}");
+            }
+            if let Err(err) = pixels.render() {
+                eprintln!("ERROR: Rendering failed: {err}");
+                event_loop.exit();
+            }
+        }
+    }
+}
 
 impl ApplicationHandler for Screen<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -59,6 +116,7 @@ impl ApplicationHandler for Screen<'_> {
             )
         };
         window.request_redraw();
+        self.window = Some(window);
     }
 
     fn window_event(
@@ -69,25 +127,8 @@ impl ApplicationHandler for Screen<'_> {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-
             // TODO: only redraw if needed
-            WindowEvent::RedrawRequested => {
-                if let Some(pixels) = self.pixels.as_mut() {
-                    let frame = pixels.frame_mut();
-                    for (_i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-                        //let x = (i % WIDTH as usize) as u8;
-                        //let y = (i / WIDTH as usize) as u8;
-                        // RGBA color assignment: C64 blue background
-                        //pixel.copy_from_slice(&[0x40, 0x40, 0xe0, 0xff]);
-                        pixel.copy_from_slice(&C64_PALETTE[C64Colour::Blue as usize]);
-                    }
-                    if let Err(err) = pixels.render() {
-                        eprintln!("ERROR: Rendering failed: {err}");
-                        event_loop.exit();
-                    }
-                }
-            }
-
+            WindowEvent::RedrawRequested => self.do_redraw(event_loop),
             _ => (),
         }
     }
