@@ -1,9 +1,7 @@
 mod char_rom;
 mod control;
 
-use std::
-    sync::{Arc, mpsc::Sender}
-;
+use std::sync::Arc;
 
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::{
@@ -14,7 +12,7 @@ use winit::{
     window::{WindowAttributes, WindowId},
 };
 
-use crate::{cpu6502::memory::Memory, video::char_rom::CHARS};
+use crate::{cpu6502::{cpu::CPU, memory::Memory}, video::char_rom::CHARS};
 
 /**
  *  0400-07E7 Default screen memory
@@ -25,51 +23,50 @@ use crate::{cpu6502::memory::Memory, video::char_rom::CHARS};
  *  DBE8-DBFF unused
  */
 pub struct Video<'a> {
-    main_app: Sender<VideoMsg>,
-    screen: Screen<'a>,
     line: usize,
     ram_base: u16,
     color_ram_base: u16,
+    pixels: Option<Pixels<'a>>,
+    window: Option<Arc<winit::window::Window>>,
+    system: VideoSystem,
 }
 
 impl<'a> Video<'a> {
-    pub fn new(main_app: Sender<VideoMsg>, ram_base: u16, color_ram_base: u16) -> Self {
-        let screen = Screen::default();
+    pub fn new(ram_base: u16, color_ram_base: u16) -> Self {
         Video {
-            main_app,
-            screen,
             line: 0,
             ram_base,
             color_ram_base,
+            pixels: None,
+            window: None,
+            system: PAL,
         }
     }
-    pub fn run(&mut self) {
-        let ev_loop = EventLoop::new().unwrap();
-        ev_loop.set_control_flow(Poll);
-        let mut screen = Screen::new();
-        ev_loop.run_app(&mut screen).unwrap();
-        let _ = self.main_app.send(VideoMsg::Quit);
-    }
     pub fn step(&mut self, mem: &mut Memory) {
-        if self.line < self.screen.system.height {
-            self.do_char_line(mem, self.line, C64Colour::LightBlue as u8, C64Colour::Blue as u8);
+        if self.line < self.system.height {
+            self.do_char_line(
+                mem,
+                self.line,
+                C64Colour::LightBlue as u8,
+                C64Colour::Blue as u8,
+            );
             self.line += 1;
         } else {
             self.line = 0;
         }
     }
     fn do_char_line(&mut self, mem: &mut Memory, scan_y: usize, border_col: u8, bg_col: u8) {
-        if let Some(pixels) = self.screen.pixels.as_mut() {
+        if let Some(pixels) = self.pixels.as_mut() {
             let frame = pixels.frame_mut();
-            let line_start = self.line * self.screen.system.width;
-            let line = &mut frame[line_start..line_start + self.screen.system.width];
-            if scan_y < self.screen.system.y_min || scan_y > self.screen.system.y_max {
+            let line_start = self.line * self.system.width;
+            let line = &mut frame[line_start..line_start + self.system.width];
+            if scan_y < self.system.y_min || scan_y > self.system.y_max {
                 line.fill(border_col);
                 return;
             }
-            line[..self.screen.system.y_min].fill(border_col);
-            line[self.screen.system.y_max + 1..].fill(border_col);
-            let inner_y = scan_y - self.screen.system.y_min;
+            line[..self.system.y_min].fill(border_col);
+            line[self.system.y_max + 1..].fill(border_col);
+            let inner_y = scan_y - self.system.y_min;
             let char_row = inner_y / 8; // 0..24
             let char_line = inner_y % 8; // line within character
             for col in 0..40 {
@@ -78,21 +75,21 @@ impl<'a> Video<'a> {
                 let char_code = mem.load_memory_byte(self.ram_base + char_idx as u16) as usize;
                 let fg_col = mem.load_memory_byte(self.color_ram_base + char_idx as u16);
                 let pixels = CHARS[char_code * 8 + char_line];
-                let scan_x = self.screen.system.y_min + col * 8;
+                let scan_x = self.system.y_min + col * 8;
                 for bit in 0..8 {
                     // bit 7 is the leftmost pixel on the screen
                     let is_set = pixels & (0x80 >> bit) != 0;
-                    let color = if is_set { C64_PALETTE[fg_col as usize] } else { C64_PALETTE[bg_col as usize] };
+                    let color = if is_set {
+                        C64_PALETTE[fg_col as usize]
+                    } else {
+                        C64_PALETTE[bg_col as usize]
+                    };
                     let pos = scan_x + bit;
-                    line[pos..pos+4].copy_from_slice(&color);
+                    line[pos..pos + 4].copy_from_slice(&color);
                 }
             }
         }
     }
-}
-
-pub enum VideoMsg {
-    Quit,
 }
 
 struct VideoSystem {
@@ -117,47 +114,41 @@ const NTSC: VideoSystem = VideoSystem {
     y_max: 235,
 };
 
-pub struct Screen<'a> {
-    pixels: Option<Pixels<'a>>,
-    window: Option<Arc<winit::window::Window>>,
-    system: VideoSystem,
+pub struct AppHandler<'a,'b,'c> {
+    cpu: CPU<'a>,
+    video: Video<'b>,
+    mem: Memory<'c>,
 }
 
-impl Default for Screen<'_> {
-    fn default() -> Self {
-        Screen::new()
+impl <'a,'b,'c> AppHandler<'a,'b,'c> {
+    pub fn new(cpu: CPU<'a>, video: Video<'b>, mem: Memory<'c>) -> Self {
+        Self { cpu, video, mem }
+    }
+    pub fn run(&mut self) {
+        let ev_loop = EventLoop::new().unwrap();
+        ev_loop.set_control_flow(Poll);
+        ev_loop.run_app(self).unwrap();
     }
 }
-
-impl<'a> Screen<'a> {
-    pub fn new() -> Self {
-        Screen {
-            pixels: None,
-            window: None,
-            system: PAL,
-        }
-    }
-}
-
-impl ApplicationHandler for Screen<'_> {
+impl ApplicationHandler for AppHandler<'_,'_,'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = Arc::new({
             let size = LogicalSize::new(
-                self.system.width as f64 * 3.0,
-                self.system.height as f64 * 3.0,
+                self.video.system.width as f64 * 3.0,
+                self.video.system.height as f64 * 3.0,
             );
             let attr = WindowAttributes::default()
                 .with_title("Commodore 64")
                 .with_inner_size(size);
             event_loop.create_window(attr).unwrap()
         });
-        self.pixels = {
+        self.video.pixels = {
             let size = window.inner_size();
             let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
             Some(
                 PixelsBuilder::new(
-                    self.system.width as u32,
-                    self.system.height as u32,
+                    self.video.system.width as u32,
+                    self.video.system.height as u32,
                     surface_texture,
                 )
                 .build()
@@ -165,7 +156,7 @@ impl ApplicationHandler for Screen<'_> {
             )
         };
         window.request_redraw();
-        self.window = Some(window);
+        self.video.window = Some(window);
     }
 
     fn window_event(
@@ -176,9 +167,13 @@ impl ApplicationHandler for Screen<'_> {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::RedrawRequested => {},
+            WindowEvent::RedrawRequested => {}
             _ => (),
         }
+    }
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        self.cpu.step(&mut self.mem);
+        self.video.step(&mut self.mem);
     }
 }
 
