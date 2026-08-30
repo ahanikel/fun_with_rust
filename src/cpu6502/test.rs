@@ -1,32 +1,34 @@
 #![cfg(test)]
-use crate::cpu6502::model::addr_mode::AddrMode::Relative;
+use crate::cpu6502::model::addr_mode::AddrMode;
 use crate::cpu6502::model::opcode_from_instruction_and_mode;
+use crate::cpu6502::model::instruction::Instruction;
 use crate::cpu6502::*;
 
 #[test]
 fn test_brk_rti() {
     let mut cpu = CPU::new();
-    cpu.reset();
-    cpu.mem[0xfffe] = 0xee;
-    cpu.mem[0xffff] = 0xee;
-    cpu.mem[0xeef0] = 0x40; // RTI
+    let mut mem = Memory::new();
+    cpu.reset(&mut mem);
+    mem.store_memory_byte(0xfffe, 0xee);
+    mem.store_memory_byte(0xffff, 0xee);
+    mem.store_memory_byte(0xeef0, 0x40); // RTI
     for step in 0..14 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::BRK));
     assert!(cpu.is_set(StatusFlag::IRQDisable));
     assert_eq!(0xeeee, cpu.pc);
     for step in 14..16 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::BRK));
     assert!(cpu.is_set(StatusFlag::IRQDisable));
     assert_eq!(0xeef0, cpu.pc);
     for step in 16..18 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::BRK));
     assert!(cpu.is_clear(StatusFlag::IRQDisable));
@@ -36,21 +38,22 @@ fn test_brk_rti() {
 #[test]
 fn test_jsr_ret() {
     let mut cpu = CPU::new();
-    cpu.mem[0xfffc] = 0xcc;
-    cpu.mem[0xfffd] = 0xcc;
-    cpu.mem[0xcccc] = 0x20; // JSR
-    cpu.mem[0xcccd] = 0xdd;
-    cpu.mem[0xccce] = 0xdd;
-    cpu.mem[0xdddd] = 0x60; // RTS
-    cpu.reset();
+    let mut mem = Memory::new();
+    mem.store_memory_byte(0xfffc, 0xcc);
+    mem.store_memory_byte(0xfffd, 0xcc);
+    mem.store_memory_byte(0xcccc, 0x20); // JSR
+    mem.store_memory_byte(0xcccd, 0xdd);
+    mem.store_memory_byte(0xccce, 0xdd);
+    mem.store_memory_byte(0xdddd, 0x60); // RTS
+    cpu.reset(&mut mem);
     for step in 0..13 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert_eq!(0xdddd, cpu.pc);
     for step in 13..15 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert_eq!(0xcccf, cpu.pc);
 }
@@ -58,14 +61,15 @@ fn test_jsr_ret() {
 #[test]
 fn test_beq_taken() {
     let mut cpu = CPU::new();
-    cpu.mem[0xfffc] = 0xaa;
-    cpu.mem[0xfffd] = 0xaa;
-    cpu.mem[0xaaaa] = 0xf0; // BEQ
-    cpu.mem[0xaaab] = 0xc0;
-    cpu.reset();
+    let mut mem = Memory::new();
+    mem.store_memory_byte(0xfffc, 0xaa);
+    mem.store_memory_byte(0xfffd, 0xaa);
+    mem.store_memory_byte(0xaaaa, 0xf0); // BEQ
+    mem.store_memory_byte(0xaaab, 0xc0);
+    cpu.reset(&mut mem);
     cpu.set_flag(StatusFlag::Zero);
     for step in 0..10 {
-        cpu.step();
+        cpu.step(&mut mem);
         println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(0, cpu.cycle);
@@ -75,15 +79,16 @@ fn test_beq_taken() {
 #[test]
 fn test_beq_not_taken() {
     let mut cpu = CPU::new();
-    cpu.mem[0xfffc] = 0xaa;
-    cpu.mem[0xfffd] = 0xaa;
-    cpu.mem[0xaaaa] = 0xf0; // BEQ
-    cpu.mem[0xaaab] = 0xc0;
-    cpu.reset();
+    let mut mem = Memory::new();
+    mem.store_memory_byte(0xfffc, 0xaa);
+    mem.store_memory_byte(0xfffd, 0xaa);
+    mem.store_memory_byte(0xaaaa, 0xf0); // BEQ
+    mem.store_memory_byte(0xaaab, 0xc0);
+    cpu.reset(&mut mem);
     cpu.clear_flag(StatusFlag::Zero);
     for step in 0..9 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert_eq!(0, cpu.cycle);
     assert_eq!(0xaaac, cpu.pc);
@@ -92,18 +97,19 @@ fn test_beq_not_taken() {
 #[test]
 fn test_cmp_zpx_ind_lt() {
     let mut cpu = CPU::new();
-    cpu.reset();
+    let mut mem = Memory::new();
+    cpu.reset(&mut mem);
     cpu.pc = 0x1000;
     cpu.a = 0x55;
     cpu.x = 1;
-    cpu.mem[0x50] = 0x99;
-    cpu.mem[0x51] = 0x99;
-    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
-    cpu.mem[0x1001] = 0x4f;
-    cpu.mem[0x9999] = 0xf0;
+    mem.store_memory_byte(0x50, 0x99);
+    mem.store_memory_byte(0x51, 0x99);
+    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
+    mem.store_memory_byte(0x1001, 0x4f);
+    mem.store_memory_byte(0x9999, 0xf0);
     for step in 0..13 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::Negative));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -113,18 +119,19 @@ fn test_cmp_zpx_ind_lt() {
 #[test]
 fn test_cmp_zpx_ind_eq() {
     let mut cpu = CPU::new();
-    cpu.reset();
+    let mut mem = Memory::new();
+    cpu.reset(&mut mem);
     cpu.pc = 0x1000;
     cpu.a = 0x55;
     cpu.x = 1;
-    cpu.mem[0x50] = 0x99;
-    cpu.mem[0x51] = 0x99;
-    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
-    cpu.mem[0x1001] = 0x4f;
-    cpu.mem[0x9999] = 0x55;
+    mem.store_memory_byte(0x50, 0x99);
+    mem.store_memory_byte(0x51, 0x99);
+    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
+    mem.store_memory_byte(0x1001, 0x4f);
+    mem.store_memory_byte(0x9999, 0x55);
     for step in 0..13 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert!(cpu.is_set(StatusFlag::Zero));
@@ -134,18 +141,19 @@ fn test_cmp_zpx_ind_eq() {
 #[test]
 fn test_cmp_zpx_ind_gt() {
     let mut cpu = CPU::new();
-    cpu.reset();
+    let mut mem = Memory::new();
+    cpu.reset(&mut mem);
     cpu.pc = 0x1000;
     cpu.a = 0xfe;
     cpu.x = 1;
-    cpu.mem[0x50] = 0x99;
-    cpu.mem[0x51] = 0x99;
-    cpu.mem[0x1000] = 0xc1; // CMP (zp,x)
-    cpu.mem[0x1001] = 0x4f;
-    cpu.mem[0x9999] = 0x55;
+    mem.store_memory_byte(0x50, 0x99);
+    mem.store_memory_byte(0x51, 0x99);
+    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
+    mem.store_memory_byte(0x1001, 0x4f);
+    mem.store_memory_byte(0x9999, 0x55);
     for step in 0..13 {
         print!("Step {step}: ");
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -161,6 +169,7 @@ fn _test_sbc(
     expected_carry: bool,
 ) {
     let mut cpu = CPU::new();
+    let mut mem = Memory::new();
     let carry_inst = if carry {
         Instruction::SEC
     } else {
@@ -173,13 +182,13 @@ fn _test_sbc(
         opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::Immediate),
         b,
     ];
-    cpu.reset();
+    cpu.reset(&mut mem);
     cpu.pc = 0x1000;
     for (pos, b) in prog.iter().enumerate() {
-        cpu.mem[0x1000 + pos] = *b;
+        mem.store_memory_byte(0x1000 + pos as u16, *b);
     }
     for step in 0..14 {
-        cpu.step();
+        cpu.step(&mut mem);
         println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(
@@ -324,6 +333,7 @@ fn test_sbc_8() {
 
 fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_carry: bool) {
     let mut cpu = CPU::new();
+    let mut mem = Memory::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         a,
@@ -331,13 +341,13 @@ fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_c
         opcode_from_instruction_and_mode(Instruction::ADC, AddrMode::Immediate),
         b,
     ];
-    cpu.reset();
+    cpu.reset(&mut mem);
     cpu.pc = 0x1000;
     for (pos, b) in prog.iter().enumerate() {
-        cpu.mem[0x1000 + pos] = *b;
+        mem.store_memory_byte(0x1000 + pos as u16, *b);
     }
     for step in 0..14 {
-        cpu.step();
+        cpu.step(&mut mem);
         println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(
@@ -478,6 +488,7 @@ FFC1 ...
 fn test_cmp_sbc_1() {
     for mem_0x28 in [0, 2] {
         let mut cpu = CPU::new();
+    let mut mem = Memory::new();
         let prog = [
             opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
             0x24,
@@ -487,25 +498,25 @@ fn test_cmp_sbc_1() {
             0x25,
             opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::ZeroPage),
             0x29,
-            opcode_from_instruction_and_mode(Instruction::BCS, Relative),
+            opcode_from_instruction_and_mode(Instruction::BCS, AddrMode::Relative),
             0xc1,
         ];
-        cpu.reset();
+        cpu.reset(&mut mem);
         cpu.pc = 0xffb7;
         for (pos, b) in prog.iter().enumerate() {
-            cpu.mem[0xffb7 + pos] = *b;
+            mem.store_memory_byte(0xffb7 + pos as u16, *b);
         }
-        cpu.mem[0x0024] = 0;
-        cpu.mem[0x0025] = 0;
-        cpu.mem[0x0028] = mem_0x28;
-        cpu.mem[0x0029] = 0;
+        mem.store_memory_byte(0x0024, 0);
+        mem.store_memory_byte(0x0025, 0);
+        mem.store_memory_byte(0x0028, mem_0x28);
+        mem.store_memory_byte(0x0029, 0);
         for step in 0..21 {
-            cpu.step();
+            cpu.step(&mut mem);
             println!("Step {step}: {}", cpu.status_line);
         }
         match mem_0x28 {
             0 => {
-                cpu.step();
+                cpu.step(&mut mem);
                 println!("Step 21: {}", cpu.status_line);
                 assert!(cpu.is_set(StatusFlag::Carry));
                 assert!(cpu.is_set(StatusFlag::Zero));
@@ -535,6 +546,7 @@ FFC1 ...
 */
 fn test_cmp_sbc_2() {
     let mut cpu = CPU::new();
+    let mut mem = Memory::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
         0x24,
@@ -544,21 +556,21 @@ fn test_cmp_sbc_2() {
         0x25,
         opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::ZeroPage),
         0x29,
-        opcode_from_instruction_and_mode(Instruction::BCS, Relative),
+        opcode_from_instruction_and_mode(Instruction::BCS, AddrMode::Relative),
         0xc1,
     ];
-    cpu.reset();
+    cpu.reset(&mut mem);
     cpu.pc = 0xffb7;
     for (pos, b) in prog.iter().enumerate() {
-        cpu.mem[0xffb7 + pos] = *b;
+        mem.store_memory_byte(0xffb7 + pos as u16, *b);
     }
-    cpu.mem[0x0024] = 0x00;
-    cpu.mem[0x0025] = 0xff;
-    cpu.mem[0x0028] = 0x01;
-    cpu.mem[0x0029] = 0xff;
+    mem.store_memory_byte(0x0024, 0x00);
+    mem.store_memory_byte(0x0025, 0xff);
+    mem.store_memory_byte(0x0028, 0x01);
+    mem.store_memory_byte(0x0029, 0xff);
     for step in 0..21 {
         println!("Step {step}: {}", cpu.status_line);
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Carry));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -569,6 +581,7 @@ fn test_cmp_sbc_2() {
 #[test]
 fn test_bit() {
     let mut cpu = CPU::new();
+    let mut mem = Memory::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         0x74,
@@ -576,17 +589,17 @@ fn test_bit() {
         0x2b,
         opcode_from_instruction_and_mode(Instruction::BIT, AddrMode::ZeroPage),
         0x2b,
-        opcode_from_instruction_and_mode(Instruction::BVC, Relative),
+        opcode_from_instruction_and_mode(Instruction::BVC, AddrMode::Relative),
         0x10,
     ];
-    cpu.reset();
+    cpu.reset(&mut mem);
     cpu.pc = 0xff70;
     for (pos, b) in prog.iter().enumerate() {
-        cpu.mem[0xff70 + pos] = *b;
+        mem.store_memory_byte(0xff70 + pos as u16, *b);
     }
     for step in 0..17 {
         println!("Step {step}: {}", cpu.status_line);
-        cpu.step();
+        cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::Overflow));
     assert_eq!(0xff78, cpu.pc);

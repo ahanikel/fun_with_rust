@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::VecDeque, io::Read, rc::Rc};
 
-use crate::cpu6502::device::Device;
+use crate::cpu6502::memory::Device;
 
 #[allow(clippy::type_complexity)]
 pub struct Acia {
@@ -39,7 +39,7 @@ impl Acia {
 }
 
 impl Device for Acia {
-    fn read(&mut self, reg: u8) -> u8 {
+    fn read(&mut self, addr: u16) -> u8 {
         if self.input.is_empty() && self.stdin_enabled {
             let mut buf: [u8; 1] = [0; 1];
             let _ = std::io::stdin().read(&mut buf);
@@ -52,7 +52,7 @@ impl Device for Acia {
                 self.input.push_back(buf[0]);
             }
         }
-        match reg {
+        match addr {
             0 => self.input.pop_front().unwrap_or(b'?'),
             // status bit 4: tx data reg empty (always in our case); bit 3: rx data reg full
             1 => {
@@ -67,8 +67,8 @@ impl Device for Acia {
             _ => 0, // should not happen
         }
     }
-    fn write(&mut self, reg: u8, byte: u8) {
-        match reg {
+    fn write(&mut self, addr: u16, byte: u8) {
+        match addr {
             0 => {
                 if let Some(log) = &self.log_output {
                     log.borrow_mut()(byte); // data register

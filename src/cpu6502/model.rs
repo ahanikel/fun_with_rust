@@ -4,6 +4,8 @@ pub mod instruction;
 use addr_mode::AddrMode;
 use instruction::Instruction;
 
+use crate::cpu6502::memory::Memory;
+
 #[allow(unused)]
 pub trait IsOriginal {
     fn is_original(&self) -> bool;
@@ -271,39 +273,39 @@ pub fn instruction_and_mode(opcode: u8) -> (Instruction, AddrMode) {
     ][opcode]
 }
 
-pub fn disasm(pc: u16, mem: &[u8]) -> String {
-    match instruction_and_mode(mem[0]) {
+pub fn disasm(pc: u16, mem: &mut Memory) -> String {
+    match instruction_and_mode(mem.load_memory_byte(pc)) {
         (inst, AddrMode::Absolute) => {
-            format!("{} ${:04X}", inst, u16::from_le_bytes([mem[1], mem[2]]))
+            format!("{} ${:04X}", inst, mem.load_memory_word(pc.wrapping_add(1)))
         }
         (inst, AddrMode::AbsoluteIndexedIndirect) => {
-            format!("{} (${:04X},X)", inst, u16::from_le_bytes([mem[1], mem[2]]))
+            format!("{} (${:04X},X)", inst, mem.load_memory_word(pc.wrapping_add(1)))
         }
         (inst, AddrMode::AbsoluteIndexedWithX) => {
-            format!("{} ${:04X},X", inst, u16::from_le_bytes([mem[1], mem[2]]))
+            format!("{} ${:04X},X", inst, mem.load_memory_word(pc.wrapping_add(1)))
         }
         (inst, AddrMode::AbsoluteIndexedWithY) => {
-            format!("{} ${:04X},Y", inst, u16::from_le_bytes([mem[1], mem[2]]))
+            format!("{} ${:04X},Y", inst, mem.load_memory_word(pc.wrapping_add(1)))
         }
         (inst, AddrMode::AbsoluteIndirect) => {
-            format!("{} (${:04X})", inst, u16::from_le_bytes([mem[1], mem[2]]))
+            format!("{} (${:04X})", inst, mem.load_memory_word(pc.wrapping_add(1)))
         }
         (inst, AddrMode::Accumulator) => format!("{}", inst),
-        (inst, AddrMode::Immediate) => format!("{} #${:02X}", inst, mem[1]),
+        (inst, AddrMode::Immediate) => format!("{} #${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))),
         (inst, AddrMode::Implied) => format!("{}", inst),
         (inst, AddrMode::Relative) => format!(
             "{} ${:04X}",
             inst,
             pc.wrapping_add(2)
-                .wrapping_add_signed(mem[1].cast_signed().into())
+                .wrapping_add_signed(mem.load_memory_byte(pc.wrapping_add(1)).cast_signed().into())
         ),
-        (inst, AddrMode::ZeroPage) => format!("{} ${:02X}", inst, mem[1]),
-        (inst, AddrMode::ZeroPageIndexedIndirect) => format!("{} (${:02X},X)", inst, mem[1]),
-        (inst, AddrMode::ZeroPageIndexedWithX) => format!("{} ${:02X},X", inst, mem[1]),
-        (inst, AddrMode::ZeroPageIndexedWithY) => format!("{} ${:02X},Y", inst, mem[1]),
-        (inst, AddrMode::ZeroPageIndirect) => format!("{} (${:02X})", inst, mem[1]),
-        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${}),Y", inst, mem[1]),
-        (inst, AddrMode::ZeroPageRelative) => format!("{} #${:02X} ${:02X}", inst, mem[1], mem[2]),
+        (inst, AddrMode::ZeroPage) => format!("{} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndexedIndirect) => format!("{} (${:02X},X)", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndexedWithX) => format!("{} ${:02X},X", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndexedWithY) => format!("{} ${:02X},Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndirect) => format!("{} (${:02X})", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${}),Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageRelative) => format!("{} #${:02X} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1)), mem.load_memory_byte(pc.wrapping_add(2))),
     }
 }
 

@@ -1,5 +1,6 @@
 #![cfg(test)]
 use crate::cpu6502::acia::*;
+use crate::cpu6502::memory::MemoryFromFile;
 use crate::cpu6502::*;
 use std::cell::RefCell;
 use std::io::Write;
@@ -7,49 +8,44 @@ use std::rc::Rc;
 use std::time::Duration;
 
 #[allow(clippy::type_complexity)]
-fn setup_cpu<'a>(
+fn setup_cpu<'a,'b>(
     input: &str,
     log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>,
     log_instructions: Option<&'a mut dyn FnMut(&str)>,
-) -> CPU<'a> {
-    use crate::cpu6502::device::Device;
-    use std::{cell::RefCell, io::Read, rc::Rc};
-
-    let image = "test-resources/test-image";
+) -> (CPU<'a>, Memory<'b>) {
     let mut cpu: CPU<'a> = CPU::new();
     cpu.log_instructions = log_instructions;
-    let mut f = std::fs::File::open(image).unwrap();
-    f.read_exact(&mut cpu.mem[32768..]).unwrap();
-    let mut acia = Acia::new(log_output);
+    let image = "test-resources/test-image";
+    let wozmon = Box::new(MemoryFromFile::new(image));
+    let mut mem = Memory::new();
+    mem.register_device(wozmon, 0x8000, 0xffff);
+    let mut acia = Box::new(Acia::new(log_output));
     acia.set_input(input);
-    let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
-    for addr in 0x5000..=0x5003 {
-        cpu.register_device(addr, acia.clone());
-    }
-    cpu.reset();
-    cpu
+    mem.register_device(acia, 0x5000, 0x5003);
+    cpu.reset(&mut mem);
+    (cpu, mem)
 }
 
 #[allow(unused)]
-fn run_cpu(cpu: &mut CPU, no_cycles: u32) {
+fn run_cpu(cpu: &mut CPU, mem: &mut Memory, no_cycles: u32) {
     for cycle in 0..no_cycles {
-        cpu.step();
+        cpu.step(mem);
     }
 }
 
 #[allow(unused)]
-fn run_cpu_with_timer_interrupt(cpu: &mut CPU, no_cycles: u32) {
+fn run_cpu_with_timer_interrupt(cpu: &mut CPU, mem: &mut Memory, no_cycles: u32) {
     for cycle in 1..=no_cycles {
         // every 20ms or 50 times per second
         if cycle % 20000 == 0 {
             cpu.irq = true;
         }
-        cpu.step();
+        cpu.step(mem);
     }
 }
 
 #[allow(unused)]
-fn run_cpu_with_timing(cpu: &mut CPU, no_cycles: u32) {
+fn run_cpu_with_timing(cpu: &mut CPU, mem: &mut Memory, no_cycles: u32) {
     let mut now = std::time::Instant::now();
     let mut elapsed = Duration::default();
     let mut last_irq = std::time::Instant::now();
@@ -59,7 +55,7 @@ fn run_cpu_with_timing(cpu: &mut CPU, no_cycles: u32) {
             cpu.irq = true;
             last_irq = std::time::Instant::now();
         }
-        cpu.step();
+        cpu.step(mem);
         elapsed += std::time::Instant::now() - now;
         if cpu.cycle < cpu.cycles && cpu.cycle == cpu.cycles - 1 {
             let expected = Duration::from_micros(cpu.cycles.into());
@@ -90,19 +86,19 @@ fn test_input_output(input: &str, output: &str) {
             o.push(b.into());
         }
     };
-    let mut cpu = setup_cpu(
+    let (mut cpu, mut mem) = setup_cpu(
         input,
         Some(Rc::new(RefCell::new(out_fn))),
         Some(&mut log_fn),
     );
-    run_cpu(&mut cpu, 2000000);
+    run_cpu(&mut cpu, &mut mem, 2000000);
     let out = out.take();
     let log = log.take();
     {
         let mut log_file = std::fs::File::create("/tmp/asm.log").unwrap();
         log_file.write_all(log.as_bytes()).unwrap();
     }
-    assert_eq!(input.as_bytes().to_ascii_uppercase(), &cpu.mem[0x200..0x200+input.len()]);
+    assert_eq!(input.as_bytes().to_ascii_uppercase(), mem.get_range(0x200..0x200+input.len()));
     assert_eq!(output, &out);
 }
 

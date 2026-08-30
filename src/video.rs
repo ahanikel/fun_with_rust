@@ -1,7 +1,9 @@
 mod char_rom;
 mod control;
 
-use std::sync::{Arc, mpsc::Sender};
+use std::
+    sync::{Arc, mpsc::Sender}
+;
 
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::{
@@ -11,6 +13,8 @@ use winit::{
     event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop},
     window::{WindowAttributes, WindowId},
 };
+
+use crate::{cpu6502::memory::Memory, video::char_rom::CHARS};
 
 /**
  *  0400-07E7 Default screen memory
@@ -23,13 +27,21 @@ use winit::{
 pub struct Video<'a> {
     main_app: Sender<VideoMsg>,
     screen: Screen<'a>,
-    cycle: u16,
+    line: usize,
+    ram_base: u16,
+    color_ram_base: u16,
 }
 
-impl Video<'_> {
-    pub fn new(main_app: Sender<VideoMsg>) -> Self {
+impl<'a> Video<'a> {
+    pub fn new(main_app: Sender<VideoMsg>, ram_base: u16, color_ram_base: u16) -> Self {
         let screen = Screen::default();
-        Video { main_app, screen, cycle: 0 }
+        Video {
+            main_app,
+            screen,
+            line: 0,
+            ram_base,
+            color_ram_base,
+        }
     }
     pub fn run(&mut self) {
         let ev_loop = EventLoop::new().unwrap();
@@ -38,12 +50,43 @@ impl Video<'_> {
         ev_loop.run_app(&mut screen).unwrap();
         let _ = self.main_app.send(VideoMsg::Quit);
     }
-    pub fn step(&mut self) {
-        if self.cycle == 49999 {
-            self.screen.redraw();
-            self.cycle = 0;
+    pub fn step(&mut self, mem: &mut Memory) {
+        if self.line < self.screen.system.height {
+            self.do_char_line(mem, self.line, C64Colour::LightBlue as u8, C64Colour::Blue as u8);
+            self.line += 1;
         } else {
-            self.cycle += 1;
+            self.line = 0;
+        }
+    }
+    fn do_char_line(&mut self, mem: &mut Memory, scan_y: usize, border_col: u8, bg_col: u8) {
+        if let Some(pixels) = self.screen.pixels.as_mut() {
+            let frame = pixels.frame_mut();
+            let line_start = self.line * self.screen.system.width;
+            let line = &mut frame[line_start..line_start + self.screen.system.width];
+            if scan_y < self.screen.system.y_min || scan_y > self.screen.system.y_max {
+                line.fill(border_col);
+                return;
+            }
+            line[..self.screen.system.y_min].fill(border_col);
+            line[self.screen.system.y_max + 1..].fill(border_col);
+            let inner_y = scan_y - self.screen.system.y_min;
+            let char_row = inner_y / 8; // 0..24
+            let char_line = inner_y % 8; // line within character
+            for col in 0..40 {
+                let char_idx = char_row * 40 + col;
+                // TODO: this seems correct but not performant
+                let char_code = mem.load_memory_byte(self.ram_base + char_idx as u16) as usize;
+                let fg_col = mem.load_memory_byte(self.color_ram_base + char_idx as u16);
+                let pixels = CHARS[char_code * 8 + char_line];
+                let scan_x = self.screen.system.y_min + col * 8;
+                for bit in 0..8 {
+                    // bit 7 is the leftmost pixel on the screen
+                    let is_set = pixels & (0x80 >> bit) != 0;
+                    let color = if is_set { C64_PALETTE[fg_col as usize] } else { C64_PALETTE[bg_col as usize] };
+                    let pos = scan_x + bit;
+                    line[pos..pos+4].copy_from_slice(&color);
+                }
+            }
         }
     }
 }
@@ -52,13 +95,33 @@ pub enum VideoMsg {
     Quit,
 }
 
+struct VideoSystem {
+    width: usize,
+    height: usize,
+    y_min: usize,
+    y_max: usize,
+}
+
+#[allow(unused)]
+const PAL: VideoSystem = VideoSystem {
+    width: 403,
+    height: 284,
+    y_min: 51,
+    y_max: 250,
+};
+#[allow(unused)]
+const NTSC: VideoSystem = VideoSystem {
+    width: 384,
+    height: 272,
+    y_min: 36,
+    y_max: 235,
+};
+
 pub struct Screen<'a> {
     pixels: Option<Pixels<'a>>,
     window: Option<Arc<winit::window::Window>>,
+    system: VideoSystem,
 }
-
-const WIDTH: u32 = 403;
-const HEIGHT: u32 = 284;
 
 impl Default for Screen<'_> {
     fn default() -> Self {
@@ -71,28 +134,7 @@ impl<'a> Screen<'a> {
         Screen {
             pixels: None,
             window: None,
-        }
-    }
-    pub fn redraw(&self) {
-        if let Some(w) = self.window.as_ref() {
-            w.request_redraw();
-        }
-    }
-    fn do_redraw(&mut self, event_loop: &ActiveEventLoop) {
-        if let Some(pixels) = self.pixels.as_mut() {
-            let frame = pixels.frame_mut();
-            for (_i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-                //let x = (i % WIDTH as usize) as u8;
-                //let y = (i / WIDTH as usize) as u8;
-                // RGBA color assignment: C64 blue background
-                //pixel.copy_from_slice(&[0x40, 0x40, 0xe0, 0xff]);
-                pixel.copy_from_slice(&C64_PALETTE[C64Colour::Blue as usize]);
-                println!("frame chunk: {_i}");
-            }
-            if let Err(err) = pixels.render() {
-                eprintln!("ERROR: Rendering failed: {err}");
-                event_loop.exit();
-            }
+            system: PAL,
         }
     }
 }
@@ -100,7 +142,10 @@ impl<'a> Screen<'a> {
 impl ApplicationHandler for Screen<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = Arc::new({
-            let size = LogicalSize::new(WIDTH as f64 * 3.0, HEIGHT as f64 * 3.0);
+            let size = LogicalSize::new(
+                self.system.width as f64 * 3.0,
+                self.system.height as f64 * 3.0,
+            );
             let attr = WindowAttributes::default()
                 .with_title("Commodore 64")
                 .with_inner_size(size);
@@ -110,9 +155,13 @@ impl ApplicationHandler for Screen<'_> {
             let size = window.inner_size();
             let surface_texture = SurfaceTexture::new(size.width, size.height, window.clone());
             Some(
-                PixelsBuilder::new(WIDTH, HEIGHT, surface_texture)
-                    .build()
-                    .unwrap(),
+                PixelsBuilder::new(
+                    self.system.width as u32,
+                    self.system.height as u32,
+                    surface_texture,
+                )
+                .build()
+                .unwrap(),
             )
         };
         window.request_redraw();
@@ -127,8 +176,7 @@ impl ApplicationHandler for Screen<'_> {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            // TODO: only redraw if needed
-            WindowEvent::RedrawRequested => self.do_redraw(event_loop),
+            WindowEvent::RedrawRequested => {},
             _ => (),
         }
     }

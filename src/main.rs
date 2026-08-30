@@ -1,14 +1,13 @@
 use std::{
     cell::RefCell,
-    io::{Read, Write},
+    io::Write,
     rc::Rc,
     sync::mpsc::channel,
     time::Duration,
 };
 
 use crate::{
-    cpu6502::{acia::Acia, cpu::CPU, device::Device},
-    video::{Video, VideoMsg},
+    cpu6502::{acia::Acia, cpu::CPU, memory::{Memory, MemoryDevice, MemoryFromFile}}, video::{Video, VideoMsg},
 };
 
 mod cpu6502;
@@ -34,20 +33,22 @@ fn main() {
     let mut cpu: CPU = CPU::new();
     cpu.log_instructions = Some(&mut log_fn);
     let image = "test-resources/test-image";
-    let mut f = std::fs::File::open(image).unwrap();
-    f.read_exact(&mut cpu.mem[32768..]).unwrap();
-    let acia = Acia::new(Some(Rc::new(RefCell::new(out_fn))));
-    let acia: Rc<RefCell<dyn Device>> = Rc::new(RefCell::new(acia));
-    for addr in 0x5000..=0x5003 {
-        cpu.register_device(addr, acia.clone());
-    }
-    cpu.reset();
+    let wozmon = Box::new(MemoryFromFile::new(image));
+    let mut mem = Memory::new();
+    mem.register_device(wozmon, 0x8000, 0xffff);
+    let acia = Box::new(Acia::new(Some(Rc::new(RefCell::new(out_fn)))));
+    mem.register_device(acia, 0x5000, 0x5003);
     let (sender, receiver) = channel();
-    let mut video = Video::new(sender);
+    let video_ram = Box::new(MemoryDevice::new(0x400));
+    let color_ram = Box::new(MemoryDevice::new(0x400));
+    mem.register_device(video_ram, 0x400, 0x7ff);
+    mem.register_device(color_ram, 0xd800, 0xdbff);
+    let mut video = Video::new(sender, 0x400, 0xd800);
+    cpu.reset(&mut mem);
     video.run();
     loop {
-        cpu.step(); // ascending flank
-        video.step(); // descending flank
+        cpu.step(&mut mem); // ascending flank
+        video.step(&mut mem); // descending flank
         match receiver.recv_timeout(Duration::ZERO) {
             Ok(VideoMsg::Quit) => break,
             _ => {}

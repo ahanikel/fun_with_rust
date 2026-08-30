@@ -1,6 +1,5 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::cpu6502::device::Device;
+use crate::cpu6502::memory::Memory;
 
 pub struct CPU<'a> {
     pub a: u8,
@@ -11,8 +10,6 @@ pub struct CPU<'a> {
     pub sp: u8,
     pub cycle: u8,
     pub cycles: u8,
-    pub mem: [u8; 65536],
-    pub devices: HashMap<u16, Rc<RefCell<dyn Device>>>,
     pub irq: bool,      // true if the IRQB pin is set to low
     pub nmi: bool,      // true if the NMIB pin is set to low
     pub reset: bool,
@@ -22,9 +19,8 @@ pub struct CPU<'a> {
     pub log_instructions: Option<&'a mut dyn FnMut(&str)>,
 }
 
-impl CPU<'_> {
+impl <'a> CPU<'a> {
     pub fn new() -> Self {
-        let mem: [u8; 65536] = [0; 65536];
         CPU {
             a: 0,
             x: 0,
@@ -34,8 +30,6 @@ impl CPU<'_> {
             sp: 0xff,
             cycle: 0,
             cycles: 0,
-            mem,
-            devices: HashMap::new(),
             irq: false,
             nmi: false,
             reset: false,
@@ -45,10 +39,8 @@ impl CPU<'_> {
             log_instructions: None,
         }
     }
-    pub fn reset(&mut self) {
-        self.load_memory_byte_lo(0xfffc);
-        self.load_memory_byte_hi(0xfffd);
-        self.pc = u16::from_le_bytes(self.tmp);
+    pub fn reset(&mut self, mem: &mut Memory) {
+        self.pc = mem.load_memory_word(0xfffc);
         self.st = StatusFlags(32);
         self.irq = false;
         self.nmi = false;
@@ -56,9 +48,6 @@ impl CPU<'_> {
         self.cycles = 0;
         self.reset = true;
         self.status_line = "(Reset)".to_owned();
-    }
-    pub fn register_device(&mut self, addr: u16, device: Rc<RefCell<dyn Device>>) {
-        self.devices.insert(addr, device);
     }
     pub fn change_flags(&mut self, enable: &[StatusFlag], disable: &[StatusFlag]) {
         self.set_flags(enable);
@@ -96,47 +85,6 @@ impl CPU<'_> {
     pub fn inc_pc(&mut self, arg: u8) {
         let arg_signed: i8 = arg.cast_signed();
         self.pc = self.pc.wrapping_add_signed(arg_signed.into());
-    }
-    pub fn _load_memory_byte(&mut self, addr: u16) -> u8 {
-        if let Some(dev) = self.devices.get(&addr) {
-            let reg: u8 = (addr & 0xff).try_into().unwrap();
-            dev.borrow_mut().read(reg)
-        } else {
-            let addr: usize = addr.into();
-            self.mem[addr]
-        }
-    }
-    pub fn load_memory_byte_lo(&mut self, addr: u16) {
-        self.tmp[0] = self._load_memory_byte(addr);
-    }
-    pub fn load_memory_byte_hi(&mut self, addr: u16) {
-        self.tmp[1] = self._load_memory_byte(addr);
-    }
-    /**
-     * Load a word at address addr into self.tmp
-     */
-    pub fn load_memory_word(&mut self, addr: u16) {
-        self.load_memory_byte_lo(addr);
-        self.load_memory_byte_hi(addr + 1);
-    }
-    pub fn _store_memory_byte(&mut self, addr: u16, byte: u8) {
-        if let Some(dev) = self.devices.get(&addr) {
-            let reg: u8 = (addr & 0xff).try_into().unwrap();
-            dev.borrow_mut().write(reg, byte)
-        } else {
-            let addr: usize = addr.into();
-            self.mem[addr] = byte;
-        }
-     }
-    pub fn store_memory_byte(&mut self, addr: u16, byte: u8) {
-        self._store_memory_byte(addr, byte);
-    }
-    /**
-     * Load an address at address addr into self.tmp_addr
-     */
-    pub fn load_memory_addr(&mut self, addr: u16) {
-        self.load_memory_word(addr);
-        self.tmp_addr = u16::from_le_bytes(self.tmp);
     }
  }
 
