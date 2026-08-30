@@ -41,15 +41,16 @@ impl Acia {
 impl Device for Acia {
     fn read(&mut self, addr: u16) -> u8 {
         if self.input.is_empty() && self.stdin_enabled {
-            let mut buf: [u8; 1] = [0; 1];
-            let _ = std::io::stdin().read(&mut buf);
-            if buf[0] == b'\n' {
-                self.input.push_back(b'\r');
-            } else if buf[0] >= b'a' && buf[0] <= b'z' {
-                let b = b'A' + (buf[0] - b'a');
-                self.input.push_back(b);
-            } else {
-                self.input.push_back(buf[0]);
+            let mut buf = [0_u8;1];
+            if let Ok(1) = std::io::stdin().read(&mut buf) {
+                if buf[0] == b'\n' {
+                    self.input.push_back(b'\r');
+                } else if buf[0] >= b'a' && buf[0] <= b'z' {
+                    let b = b'A' + (buf[0] - b'a');
+                    self.input.push_back(b);
+                } else {
+                    self.input.push_back(buf[0]);
+                }
             }
         }
         match addr {
