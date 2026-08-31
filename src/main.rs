@@ -1,12 +1,11 @@
 use std::{cell::RefCell, io::Write, rc::Rc};
 
+use tracing::info;
+
 use crate::{
     cpu6502::{
-        acia::Acia,
-        cpu::CPU,
-        memory::{Memory, MemoryDevice, MemoryFromFile},
-    },
-    video::{AppHandler, Video},
+        acia::{Acia, Message}, cpu::CPU, memory::{Memory, MemoryDevice, MemoryFromFile},
+    }, video::{AppHandler, Video},
 };
 
 mod cpu6502;
@@ -14,6 +13,8 @@ mod heap;
 mod video;
 
 fn main() {
+    tracing_subscriber::fmt::init();
+    info!("Application starting");
     _run_heap();
     let log1 = Rc::new(RefCell::new(String::new()));
     let log = log1.clone();
@@ -34,7 +35,7 @@ fn main() {
     let image = "test-resources/test-image";
     let wozmon = Box::new(MemoryFromFile::new(image));
     let mut acia = Box::new(Acia::new(Some(Rc::new(RefCell::new(out_fn)))));
-    acia.start();
+    let acia_sender = acia.start();
     let mut mem = Memory::new();
     mem.register_device(wozmon, 0x8000, 0xffff);
     mem.register_device(acia, 0x5000, 0x5003);
@@ -45,8 +46,9 @@ fn main() {
     let video = Video::new(0x400, 0xd800);
     cpu.reset(&mut mem);
     let mut app = AppHandler::new(cpu, video, mem);
+    info!("Running event loop");
     app.run();
-    // acia.stop()
+    let _ = acia_sender.send(Message::Quit);
 }
 
 fn _run_heap() {

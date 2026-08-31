@@ -1,9 +1,5 @@
 use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    rc::Rc,
-    sync::{Arc, RwLock},
-    thread::{self, JoinHandle},
+    cell::RefCell, collections::VecDeque, rc::Rc, sync::{Arc, RwLock, mpsc::{Sender, channel}}, thread::{self, JoinHandle},
 };
 
 use crate::cpu6502::memory::Device;
@@ -16,7 +12,10 @@ pub struct Acia {
     control: u8,
     log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>,
     input_thread: Option<JoinHandle<()>>,
-    input_thread_stop: Arc<RwLock<bool>>,
+}
+
+pub enum Message {
+    Quit,
 }
 
 #[allow(clippy::type_complexity)]
@@ -30,15 +29,15 @@ impl Acia {
             control: 0,
             log_output,
             input_thread: None,
-            input_thread_stop: Arc::new(RwLock::new(false)),
         }
     }
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Sender<Message> {
         let input = self.input.clone();
-        let stop = self.input_thread_stop.clone();
+        let (sender, receiver) = channel();
         if self.stdin_enabled {
             self.input_thread = Some(thread::spawn(move || {
-                while !*stop.read().unwrap() {
+                info!("ACIA background thread starting.");
+                loop {
                     if let Some(c) = read_char_non_blocking() {
                         if c == b'\n' {
                             input.write().unwrap().push_back(b'\r');
@@ -49,14 +48,14 @@ impl Acia {
                             input.write().unwrap().push_back(c);
                         }
                     }
-                    thread::sleep(Duration::from_millis(10));
+                    if let Ok(Message::Quit) = receiver.recv_timeout(Duration::from_millis(10)) {
+                        info!("ACIA background thread terminating.");
+                        break;
+                    }
                 }
             }))
         };
-    }
-    #[allow(dead_code)]
-    pub fn stop(&mut self) {
-        *self.input_thread_stop.write().unwrap() = true;
+        sender
     }
     #[cfg(test)]
     pub fn set_input(&mut self, s: &str) {
@@ -109,6 +108,7 @@ use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use tracing::info;
 use std::time::Duration;
 
 fn read_char_non_blocking() -> Option<u8> {
