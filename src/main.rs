@@ -1,9 +1,12 @@
-use std::{
-    cell::RefCell, io::Write, rc::Rc,
-};
+use std::{cell::RefCell, io::Write, rc::Rc};
 
 use crate::{
-    cpu6502::{acia::Acia, cpu::CPU, memory::{Memory, MemoryDevice, MemoryFromFile}}, video::{AppHandler, Video},
+    cpu6502::{
+        acia::Acia,
+        cpu::CPU,
+        memory::{Memory, MemoryDevice, MemoryFromFile},
+    },
+    video::{AppHandler, Video},
 };
 
 mod cpu6502;
@@ -30,9 +33,10 @@ fn main() {
     cpu.log_instructions = Some(&mut log_fn);
     let image = "test-resources/test-image";
     let wozmon = Box::new(MemoryFromFile::new(image));
+    let mut acia = Box::new(Acia::new(Some(Rc::new(RefCell::new(out_fn)))));
+    acia.start();
     let mut mem = Memory::new();
     mem.register_device(wozmon, 0x8000, 0xffff);
-    let acia = Box::new(Acia::new(Some(Rc::new(RefCell::new(out_fn)))));
     mem.register_device(acia, 0x5000, 0x5003);
     let video_ram = Box::new(MemoryDevice::new(0x400));
     let color_ram = Box::new(MemoryDevice::new(0x400));
@@ -42,6 +46,7 @@ fn main() {
     cpu.reset(&mut mem);
     let mut app = AppHandler::new(cpu, video, mem);
     app.run();
+    // acia.stop()
 }
 
 fn _run_heap() {
