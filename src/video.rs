@@ -58,10 +58,11 @@ impl<'a> Video<'a> {
     fn do_char_line(&mut self, mem: &mut Memory, scan_y: usize, border_col: u8, bg_col: u8) {
         if let Some(pixels) = self.pixels.as_mut() {
             let frame = pixels.frame_mut();
-            let line_start = self.line * self.system.width;
-            let line = &mut frame[line_start..line_start + self.system.width];
+            let line_start = self.line * self.system.width * 4;
+            let line = &mut frame[line_start..line_start + self.system.width * 4];
+            let scr_border_col = C64_PALETTE[border_col as usize];
             if scan_y < self.system.y_min || scan_y > self.system.y_max {
-                line.fill(border_col);
+                line.copy_from_slice(&scr_border_col.repeat((line.len()) / 4));
                 return;
             }
             line[..self.system.y_min].fill(border_col);
@@ -88,6 +89,7 @@ impl<'a> Video<'a> {
                     line[pos..pos + 4].copy_from_slice(&color);
                 }
             }
+            pixels.render().unwrap();
         }
     }
 }
