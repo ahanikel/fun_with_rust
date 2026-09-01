@@ -12,7 +12,10 @@ use winit::{
     window::{WindowAttributes, WindowId},
 };
 
-use crate::{cpu6502::{cpu::CPU, memory::Memory}, video::char_rom::CHARS};
+use crate::{
+    cpu6502::{cpu::CPU, memory::Memory},
+    video::char_rom::CHARS,
+};
 
 /**
  *  0400-07E7 Default screen memory
@@ -32,6 +35,8 @@ pub struct Video<'a> {
 }
 
 impl<'a> Video<'a> {
+    const BYTES_PER_PIXEL: usize = 4;
+
     pub fn new(ram_base: u16, color_ram_base: u16) -> Self {
         Video {
             line: 0,
@@ -44,39 +49,57 @@ impl<'a> Video<'a> {
     }
     pub fn step(&mut self, mem: &mut Memory) {
         if self.line < self.system.height {
-            self.do_char_line(
-                mem,
-                self.line,
-                C64Colour::LightBlue as u8,
-                C64Colour::Blue as u8,
-            );
             self.line += 1;
         } else {
             self.line = 0;
         }
     }
-    fn do_char_line(&mut self, mem: &mut Memory, scan_y: usize, border_col: u8, bg_col: u8) {
+
+    pub fn do_empty_screen(&mut self, border_col: u8, bg_col: u8) {
         if let Some(pixels) = self.pixels.as_mut() {
             let frame = pixels.frame_mut();
-            let line_start = self.line * self.system.width * 4;
-            let line = &mut frame[line_start..line_start + self.system.width * 4];
             let scr_border_col = C64_PALETTE[border_col as usize];
-            if scan_y < self.system.y_min || scan_y > self.system.y_max {
-                line.copy_from_slice(&scr_border_col.repeat((line.len()) / 4));
-                return;
+            let scr_bg_col = C64_PALETTE[bg_col as usize];
+            let frame_pixel_factor = Self::BYTES_PER_PIXEL;
+            let frame_line_width = self.system.width * frame_pixel_factor;
+
+            // top border
+            let line = &mut frame[0..self.system.y_min * frame_line_width];
+            line.copy_from_slice(&scr_border_col.repeat((line.len()) / Self::BYTES_PER_PIXEL));
+
+            // bottom border
+            let line = &mut frame[self.system.y_max * frame_line_width..];
+            line.copy_from_slice(&scr_border_col.repeat((line.len()) / Self::BYTES_PER_PIXEL));
+
+            // left / right borders next to content area
+            for line_no in self.system.y_min..self.system.y_max {
+                // left border
+                let from = line_no * frame_line_width;
+                let to = from + self.system.x_min * frame_pixel_factor;
+                let (frame1, frame2) = frame.split_at_mut(to);
+                let line = &mut frame1[from..to];
+                line.copy_from_slice(&scr_border_col.repeat((line.len()) / Self::BYTES_PER_PIXEL));
+                // right border
+                let from2 = from + (self.system.x_max + 1) * frame_pixel_factor - to;
+                let to2 = (line_no + 1) * frame_line_width - to;
+                let (frame3, frame2) = frame2.split_at_mut(from2);
+                let line2 = &mut frame2[0..to2 - from2];
+                line2
+                    .copy_from_slice(&scr_border_col.repeat((line2.len()) / Self::BYTES_PER_PIXEL));
+                // content area
+                frame3.copy_from_slice(&scr_bg_col.repeat((frame3.len()) / Self::BYTES_PER_PIXEL));
             }
-            line[..self.system.y_min].fill(border_col);
-            line[self.system.y_max + 1..].fill(border_col);
-            let inner_y = scan_y - self.system.y_min;
-            let char_row = inner_y / 8; // 0..24
-            let char_line = inner_y % 8; // line within character
-            for col in 0..40 {
-                let char_idx = char_row * 40 + col;
-                // TODO: this seems correct but not performant
-                let char_code = mem.load_memory_byte(self.ram_base + char_idx as u16) as usize;
-                let fg_col = mem.load_memory_byte(self.color_ram_base + char_idx as u16);
-                let pixels = CHARS[char_code * 8 + char_line];
-                let scan_x = self.system.y_min + col * 8;
+        }
+    }
+    fn do_char_at(&mut self, ch: u8, x: u8, y: u8, fg_col: u8, bg_col: u8) {
+        if let Some(pixels) = self.pixels.as_mut() {
+            let frame = pixels.frame_mut();
+            let frame_line_width = self.system.width * Self::BYTES_PER_PIXEL;
+            let scan_y = self.system.y_min * frame_line_width;
+            for char_line in 0..8 {
+                let scan_y_offset = (y as usize * 8 + char_line) * frame_line_width;
+                let pixels = CHARS[ch as usize * 8 + char_line];
+                let scan_x_offset = (self.system.x_min + x as usize * 8) * Self::BYTES_PER_PIXEL;
                 for bit in 0..8 {
                     // bit 7 is the leftmost pixel on the screen
                     let is_set = pixels & (0x80 >> bit) != 0;
@@ -85,11 +108,10 @@ impl<'a> Video<'a> {
                     } else {
                         C64_PALETTE[bg_col as usize]
                     };
-                    let pos = scan_x + bit;
-                    line[pos..pos + 4].copy_from_slice(&color);
+                    let pos = scan_y + scan_y_offset + scan_x_offset + bit * Self::BYTES_PER_PIXEL;
+                    frame[pos..pos + Self::BYTES_PER_PIXEL].copy_from_slice(&color);
                 }
             }
-            pixels.render().unwrap();
         }
     }
 }
@@ -99,14 +121,18 @@ struct VideoSystem {
     height: usize,
     y_min: usize,
     y_max: usize,
+    x_min: usize,
+    x_max: usize,
 }
 
 #[allow(unused)]
 const PAL: VideoSystem = VideoSystem {
-    width: 403,
-    height: 284,
-    y_min: 51,
-    y_max: 250,
+    width: 428,
+    height: 312,
+    y_min: 28,
+    y_max: 284,
+    x_min: 25,
+    x_max: 402,
 };
 #[allow(unused)]
 const NTSC: VideoSystem = VideoSystem {
@@ -114,15 +140,17 @@ const NTSC: VideoSystem = VideoSystem {
     height: 272,
     y_min: 36,
     y_max: 235,
+    x_min: 32,
+    x_max: 351,
 };
 
-pub struct AppHandler<'a,'b,'c> {
+pub struct AppHandler<'a, 'b, 'c> {
     cpu: CPU<'a>,
     video: Video<'b>,
     mem: Memory<'c>,
 }
 
-impl <'a,'b,'c> AppHandler<'a,'b,'c> {
+impl<'a, 'b, 'c> AppHandler<'a, 'b, 'c> {
     pub fn new(cpu: CPU<'a>, video: Video<'b>, mem: Memory<'c>) -> Self {
         Self { cpu, video, mem }
     }
@@ -132,7 +160,7 @@ impl <'a,'b,'c> AppHandler<'a,'b,'c> {
         ev_loop.run_app(self).unwrap();
     }
 }
-impl ApplicationHandler for AppHandler<'_,'_,'_> {
+impl ApplicationHandler for AppHandler<'_, '_, '_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = Arc::new({
             let size = LogicalSize::new(
@@ -169,13 +197,27 @@ impl ApplicationHandler for AppHandler<'_,'_,'_> {
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::RedrawRequested => {}
+            WindowEvent::RedrawRequested => {
+                if let Some(p) = &mut self.video.pixels {
+                    p.render().unwrap()
+                }
+            }
             _ => (),
         }
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.cpu.step(&mut self.mem);
         self.video.step(&mut self.mem);
+        self.video
+            .do_empty_screen(C64Colour::LightBlue as u8, C64Colour::Blue as u8);
+        self.video.do_char_at(b'H' + 0x40, 10, 10, C64Colour::White as u8, C64Colour::Red as u8);
+        self.video.do_char_at(b'E' + 0x40, 11, 10, C64Colour::White as u8, C64Colour::Cyan as u8);
+        self.video.do_char_at(b'L' + 0x40, 12, 10, C64Colour::White as u8, C64Colour::Purple as u8);
+        self.video.do_char_at(b'L' + 0x40, 13, 10, C64Colour::White as u8, C64Colour::Green as u8);
+        self.video.do_char_at(b'O' + 0x40, 14, 10, C64Colour::White as u8, C64Colour::Yellow as u8);
+        if let Some(w) = &mut self.video.window {
+            w.request_redraw();
+        }
     }
 }
 
