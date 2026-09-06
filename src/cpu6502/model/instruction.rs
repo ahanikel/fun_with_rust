@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+use strum::EnumString;
+
+#[derive(Debug, Clone, Copy, PartialEq, EnumString)]
 pub enum Instruction {
     ADC,
     AND,

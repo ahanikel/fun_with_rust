@@ -344,12 +344,13 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         let regs_ = self.video.regs.clone();
         let mut regs = regs_.borrow_mut();
         regs.inc_current_raster_line();
-        if regs.get_current_raster_line() % 20000 == 0 {
+        let current_raster_line = regs.get_current_raster_line();
+        if current_raster_line % 20000 == 0 {
             if let Some(w) = &mut self.video.window {
                 w.request_redraw();
             }
         }
-        if regs.is_raster_interrupt_enabled() && regs.get_current_raster_line()
+        if regs.is_raster_interrupt_enabled() && current_raster_line
             == regs.get_raster_interrupt_at_line()
         {
             regs.set_source_is_raster_interrupt();

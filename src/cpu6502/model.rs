@@ -1,10 +1,12 @@
 pub mod addr_mode;
 pub mod instruction;
 
+use std::str::FromStr;
+
 use addr_mode::AddrMode;
 use instruction::Instruction;
 
-use crate::cpu6502::memory::Memory;
+use crate::cpu6502::{memory::Memory, model::addr_mode::AddrModeWithAddr};
 
 #[allow(unused)]
 pub trait IsOriginal {
@@ -309,7 +311,6 @@ pub fn disasm(pc: u16, mem: &mut Memory) -> String {
     }
 }
 
-#[cfg(test)]
 pub fn opcode_from_instruction_and_mode(inst: Instruction, mode: AddrMode) -> u8 {
     [
         (Instruction::BRK, AddrMode::Implied),
@@ -569,4 +570,86 @@ pub fn opcode_from_instruction_and_mode(inst: Instruction, mode: AddrMode) -> u8
         (Instruction::INC, AddrMode::AbsoluteIndexedWithX),
         (Instruction::BBS7, AddrMode::ZeroPageRelative),
     ].iter().position(|(i, m)| inst == *i && mode == *m).unwrap_or(0).try_into().unwrap_or(0)
+}
+
+#[allow(unused)]
+/**
+ * Returns the code for a line of the form "XXX #$nn", "XXX $nnnn", "XXX $nn", "XXX $nnnn,X" etc.
+ */
+pub fn asm(s: &str, origin: u16) -> anyhow::Result<Vec<u8>> {
+    let mut res = Vec::new();
+    let inst = &s[0..3].to_ascii_uppercase();
+    let inst = Instruction::from_str(inst)?;
+    let AddrModeWithAddr{mode, arg, arg_size} = 
+        if s.len() > 3 {
+            AddrModeWithAddr::from_str(&s.to_owned()[4..])?
+        } else {
+            AddrModeWithAddr { mode: AddrMode::Implied, arg: 0, arg_size: 0 }
+        };
+    let (mode, arg_size) = match (inst, mode) {
+        (Instruction::ASL, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+        (Instruction::INC, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+        (Instruction::ROL, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+        (Instruction::DEC, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+        (Instruction::LSR, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+        (Instruction::ROR, AddrMode::Implied) => (AddrMode::Accumulator, 0),
+
+        (Instruction::BPL, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BMI, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BVC, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BVS, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BRA, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BCC, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BCS, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BNE, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BEQ, AddrMode::Absolute) => (AddrMode::Relative, 1),
+
+        (Instruction::BBR0, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR1, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR2, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR3, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR4, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR5, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR6, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR7, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS0, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS1, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS2, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS3, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS4, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS5, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS6, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBS7, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        _ => (mode, arg_size),
+    };
+    let opcode = opcode_from_instruction_and_mode(inst, mode);
+    let arg =
+        match mode {
+            // TODO: There is no ZeroPageRelative addressing mode in the WDC spec, not sure where I got that
+            // from. But I don't care too much about the new instructions at this point in time.
+            AddrMode::Relative | AddrMode::ZeroPageRelative =>
+                arg.wrapping_sub(origin).wrapping_sub(2).to_le_bytes(),
+            _ => arg.to_le_bytes(),
+        };
+    res.push(opcode);
+    if arg_size > 0 {
+        res.push(arg[0]);
+    }
+    if arg_size > 1 {
+        res.push(arg[1]);
+    }
+    Ok(res)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_1() {
+        assert_eq!(vec![0xad, 0xcc, 0xbb], asm("LDA $BBCC", 0).unwrap_or_else(|e| panic!("{:?}", e)));
+        assert_eq!(vec![0x0a], asm("ASL", 0).unwrap_or_else(|e| panic!("{:?}", e)));
+        assert_eq!(vec![0xf0, 0x02], asm("BEQ $BBCC", 0xbbc8).unwrap_or_else(|e| panic!("{:?}", e)));
+        assert_eq!(vec![0xf0, 0xfc], asm("BEQ $BBCC", 0xbbce).unwrap_or_else(|e| panic!("{:?}", e)));
+    }
 }
