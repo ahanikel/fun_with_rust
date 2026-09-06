@@ -16,11 +16,11 @@ fn setup_cpu<'a,'b>(
     let mut cpu: CPU<'a> = CPU::new();
     cpu.log_instructions = log_instructions;
     let image = "test-resources/test-image";
-    let wozmon = Box::new(MemoryFromFile::new(image));
+    let wozmon = Rc::new(RefCell::new(MemoryFromFile::new(image)));
     let mut mem = Memory::new();
     mem.register_device(wozmon, 0x8000, 0xffff);
-    let mut acia = Box::new(Acia::new(log_output));
-    acia.set_input(input);
+    let acia = Rc::new(RefCell::new(Acia::new(log_output)));
+    acia.borrow_mut().set_input(input);
     mem.register_device(acia, 0x5000, 0x5003);
     cpu.reset(&mut mem);
     (cpu, mem)

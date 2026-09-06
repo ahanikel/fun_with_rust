@@ -1,4 +1,4 @@
-use std::{io::Read, ops::Range};
+use std::{cell::RefCell, io::Read, ops::Range, rc::Rc};
 
 /**
  * A memory-mapped peripheral.
@@ -14,7 +14,7 @@ pub trait Device {
  */
 pub struct Memory<'a> {
     mem: [u8; 65536],
-    devices: Vec<(Range<usize>, Box<dyn Device + 'a>)>,
+    devices: Vec<(Range<usize>, Rc<RefCell<dyn Device + 'a>>)>,
 }
 
 impl Memory<'_> {
@@ -24,7 +24,7 @@ impl Memory<'_> {
             devices: Vec::new(),
         }
     }
-    pub fn register_device(&mut self, device: Box<dyn Device>, from: usize, to: usize) {
+    pub fn register_device(&mut self, device: Rc<RefCell<dyn Device>>, from: usize, to: usize) {
         self.devices.push((from..to+1, device));
     }
     pub fn load_memory_byte(&mut self, addr: u16) -> u8 {
@@ -32,7 +32,7 @@ impl Memory<'_> {
         if let Some((Range { start, end: _ }, device)) =
             self.devices.iter_mut().find(|(r, _)| r.contains(&addr_))
         {
-            device.read(addr - *start as u16)
+            device.borrow_mut().read(addr - *start as u16)
         } else {
             self.mem[addr_]
         }
@@ -44,7 +44,7 @@ impl Memory<'_> {
         let addr_ = addr as usize;
         if let Some((Range { start, end: _}, device)) =
          self.devices.iter_mut().find(|(r, _)| r.contains(&addr_)) {
-            device.write(addr - *start as u16, byte);
+            device.borrow_mut().write(addr - *start as u16, byte);
         } else {
             self.mem[addr_] = byte;
         }

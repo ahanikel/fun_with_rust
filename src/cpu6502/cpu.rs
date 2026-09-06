@@ -86,6 +86,9 @@ impl <'a> CPU<'a> {
         let arg_signed: i8 = arg.cast_signed();
         self.pc = self.pc.wrapping_add_signed(arg_signed.into());
     }
+    pub fn request_interrupt(&mut self) {
+        self.irq = true;
+    }
  }
 
 pub struct StatusFlags(pub(crate) u8);

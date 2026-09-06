@@ -7,10 +7,7 @@ mod test;
 use cpu::{CPU, StatusFlag};
 use model::instruction_and_mode;
 
-use crate::cpu6502::{
-    memory::Memory,
-    model::addr_mode::CpuBusTransfer,
-};
+use crate::cpu6502::{memory::Memory, model::addr_mode::CpuBusTransfer};
 
 impl CPU<'_> {
     fn compare_and_set_flags(&mut self, reg: u8, byte: u8) {
@@ -83,16 +80,16 @@ impl CPU<'_> {
         }
         if self.cycle == 0 {
             let opcode = mem.load_memory_byte(self.pc);
-            self.status_line = format!(
-                "0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}",
-                self.st.0,
-                self.a,
-                self.x,
-                self.y,
-                self.pc,
-                model::disasm(self.pc, mem)
-            );
             if let Some(logger) = &mut self.log_instructions {
+                self.status_line = format!(
+                    "0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}",
+                    self.st.0,
+                    self.a,
+                    self.x,
+                    self.y,
+                    self.pc,
+                    model::disasm(self.pc, mem)
+                );
                 logger(&self.status_line);
             }
             let (inst, mode) = instruction_and_mode(opcode);

@@ -304,7 +304,7 @@ pub fn disasm(pc: u16, mem: &mut Memory) -> String {
         (inst, AddrMode::ZeroPageIndexedWithX) => format!("{} ${:02X},X", inst, mem.load_memory_byte(pc.wrapping_add(1))),
         (inst, AddrMode::ZeroPageIndexedWithY) => format!("{} ${:02X},Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
         (inst, AddrMode::ZeroPageIndirect) => format!("{} (${:02X})", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${}),Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
+        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${:02X}),Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
         (inst, AddrMode::ZeroPageRelative) => format!("{} #${:02X} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1)), mem.load_memory_byte(pc.wrapping_add(2))),
     }
 }
