@@ -340,6 +340,9 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         }
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.cia1.step() {
+            self.cpu.request_interrupt();
+        }
         self.cpu.step(&mut self.mem);
         let regs_ = self.video.regs.clone();
         let mut regs = regs_.borrow_mut();
