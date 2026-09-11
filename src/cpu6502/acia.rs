@@ -11,7 +11,7 @@ pub struct Acia {
     command: u8,
     control: u8,
     log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>,
-    input_thread: Option<JoinHandle<()>>,
+    pub input_thread: Option<JoinHandle<()>>,
 }
 
 pub enum Message {
@@ -41,6 +41,8 @@ impl Acia {
                     if let Some(c) = read_char_non_blocking() {
                         if c == b'\n' {
                             input.write().unwrap().push_back(b'\r');
+                        } else if c == b'q' {
+                            break;
                         } else if c >= b'a' && c <= b'z' {
                             let b = b'A' + (c - b'a');
                             input.write().unwrap().push_back(b);
@@ -49,10 +51,10 @@ impl Acia {
                         }
                     }
                     if let Ok(Message::Quit) = receiver.recv_timeout(Duration::from_millis(10)) {
-                        info!("ACIA background thread terminating.");
                         break;
                     }
                 }
+                info!("ACIA background thread terminating.");
             }))
         };
         sender

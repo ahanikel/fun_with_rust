@@ -1,6 +1,7 @@
-use std::{cell::RefCell, io::Write, rc::Rc};
+use std::{cell::RefCell, io::Write, path::PathBuf, rc::Rc};
 
 use tracing::info;
+use clap::Parser;
 
 use crate::{
     cpu6502::{
@@ -14,21 +15,34 @@ mod cpu6502;
 mod heap;
 mod video;
 
-fn main() {
-    c64();
+#[derive(Parser)]
+#[command(name = "emulator", about = "An emulator for the 6502 and the c64")]
+struct CmdArgs {
+    #[arg(long, default_value = "true")]
+    wozmon: bool,
+    #[arg(long, default_value = "false")]
+    c64: bool,
+    #[arg(long, default_value = "test-resources/kernal.901227-03.bin")]
+    kernal: PathBuf,
+    #[arg(long, default_value = "test-resources/basic.901226-01.bin")]
+    basic: PathBuf,
 }
 
-#[allow(unused)]
+fn main() {
+    let cmd_args = CmdArgs::parse();
+    if cmd_args.c64 {
+        c64();
+    } else {
+        wozmon();
+    }
+}
+
 fn wozmon() {
     tracing_subscriber::fmt::init();
     info!("Application starting");
-    //let log1 = Rc::new(RefCell::new(String::new()));
-    //let log = log1.clone();
+    #[allow(unused)]
     let mut log_fn = |s: &str| {
-        //log.borrow_mut().push_str(s);
-        //log.borrow_mut().push('\n');
         info!(s);
-        //let _ = std::io::stdin().read(&mut [0;1]);
     };
     let out_fn = |b: u8| {
         if b == b'\r' {
@@ -42,19 +56,23 @@ fn wozmon() {
     //cpu.log_instructions = Some(&mut log_fn);
     cpu.log_instructions = None;
     let wozmon = Rc::new(RefCell::new(MemoryFromFile::new( "test-resources/test-image")));
-    let mut acia = Rc::new(RefCell::new(Acia::new(Some(Rc::new(RefCell::new(out_fn))))));
+    let acia = Rc::new(RefCell::new(Acia::new(Some(Rc::new(RefCell::new(out_fn))))));
+    #[allow(unused)]
     let acia_sender = acia.borrow_mut().start();
     let mut mem = Memory::new();
     mem.register_device(wozmon, 0x8000, 0xffff);
-    mem.register_device(acia, 0x5000, 0x5003);
+    mem.register_device(acia.clone(), 0x5000, 0x5003);
     cpu.reset(&mut mem);
     loop {
         cpu.step(&mut mem);
+        if let Some(thr) = &acia.borrow().input_thread {
+            if thr.is_finished() {
+                break;
+            }
+        }
     }
-    let _ = acia_sender.send(Message::Quit);
 }
 
-#[allow(unused)]
 fn c64() {
     tracing_subscriber::fmt::init();
     info!("Application starting");

@@ -276,38 +276,42 @@ pub fn instruction_and_mode(opcode: u8) -> (Instruction, AddrMode) {
 }
 
 pub fn disasm(pc: u16, mem: &mut Memory) -> String {
+    disasm_and_len(pc, mem).0
+}
+
+pub fn disasm_and_len(pc: u16, mem: &mut Memory) -> (String, u8) {
     match instruction_and_mode(mem.load_memory_byte(pc)) {
         (inst, AddrMode::Absolute) => {
-            format!("{} ${:04X}", inst, mem.load_memory_word(pc.wrapping_add(1)))
+            (format!("{} ${:04X}", inst, mem.load_memory_word(pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedIndirect) => {
-            format!("{} (${:04X},X)", inst, mem.load_memory_word(pc.wrapping_add(1)))
+            (format!("{} (${:04X},X)", inst, mem.load_memory_word(pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedWithX) => {
-            format!("{} ${:04X},X", inst, mem.load_memory_word(pc.wrapping_add(1)))
+            (format!("{} ${:04X},X", inst, mem.load_memory_word(pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedWithY) => {
-            format!("{} ${:04X},Y", inst, mem.load_memory_word(pc.wrapping_add(1)))
+            (format!("{} ${:04X},Y", inst, mem.load_memory_word(pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndirect) => {
-            format!("{} (${:04X})", inst, mem.load_memory_word(pc.wrapping_add(1)))
+            (format!("{} (${:04X})", inst, mem.load_memory_word(pc.wrapping_add(1))), 3)
         }
-        (inst, AddrMode::Accumulator) => format!("{}", inst),
-        (inst, AddrMode::Immediate) => format!("{} #${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::Implied) => format!("{}", inst),
-        (inst, AddrMode::Relative) => format!(
+        (inst, AddrMode::Accumulator) => (format!("{}", inst), 1),
+        (inst, AddrMode::Immediate) => (format!("{} #${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::Implied) => (format!("{}", inst), 1),
+        (inst, AddrMode::Relative) => (format!(
             "{} ${:04X}",
             inst,
             pc.wrapping_add(2)
                 .wrapping_add_signed(mem.load_memory_byte(pc.wrapping_add(1)).cast_signed().into())
-        ),
-        (inst, AddrMode::ZeroPage) => format!("{} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndexedIndirect) => format!("{} (${:02X},X)", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndexedWithX) => format!("{} ${:02X},X", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndexedWithY) => format!("{} ${:02X},Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndirect) => format!("{} (${:02X})", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => format!("{} (${:02X}),Y", inst, mem.load_memory_byte(pc.wrapping_add(1))),
-        (inst, AddrMode::ZeroPageRelative) => format!("{} #${:02X} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1)), mem.load_memory_byte(pc.wrapping_add(2))),
+        ), 2),
+        (inst, AddrMode::ZeroPage) => (format!("{} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedIndirect) => (format!("{} (${:02X},X)", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedWithX) => (format!("{} ${:02X},X", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedWithY) => (format!("{} ${:02X},Y", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndirect) => (format!("{} (${:02X})", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => (format!("{} (${:02X}),Y", inst, mem.load_memory_byte(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageRelative) => (format!("{} #${:02X} ${:02X}", inst, mem.load_memory_byte(pc.wrapping_add(1)), mem.load_memory_byte(pc.wrapping_add(2))), 3),
     }
 }
 
@@ -604,22 +608,22 @@ pub fn asm(s: &str, origin: u16) -> anyhow::Result<Vec<u8>> {
         (Instruction::BNE, AddrMode::Absolute) => (AddrMode::Relative, 1),
         (Instruction::BEQ, AddrMode::Absolute) => (AddrMode::Relative, 1),
 
-        (Instruction::BBR0, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR1, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR2, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR3, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR4, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR5, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR6, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBR7, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS0, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS1, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS2, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS3, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS4, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS5, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS6, AddrMode::Absolute) => (AddrMode::Relative, 1),
-        (Instruction::BBS7, AddrMode::Absolute) => (AddrMode::Relative, 1),
+        (Instruction::BBR0, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR1, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR2, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR3, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR4, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR5, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR6, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBR7, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS0, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS1, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS2, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS3, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS4, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS5, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS6, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
+        (Instruction::BBS7, AddrMode::Absolute) => (AddrMode::ZeroPageRelative, 2),
         _ => (mode, arg_size),
     };
     let opcode = opcode_from_instruction_and_mode(inst, mode);
@@ -627,6 +631,10 @@ pub fn asm(s: &str, origin: u16) -> anyhow::Result<Vec<u8>> {
         match mode {
             // TODO: There is no ZeroPageRelative addressing mode in the WDC spec, not sure where I got that
             // from. But I don't care too much about the new instructions at this point in time.
+            // Update: The BBR and BBS instructions are zp-relative, and they work like this:
+            //         BBR3 $33 $1234 branches to $1234 (stored as a relative address) if bit #3 at $0033 is 0.
+            //         This breaks our assumption that all opcodes only have a single argument, so we still
+            //         don't care about these too much.
             AddrMode::Relative | AddrMode::ZeroPageRelative =>
                 arg.wrapping_sub(origin).wrapping_sub(2).to_le_bytes(),
             _ => arg.to_le_bytes(),
