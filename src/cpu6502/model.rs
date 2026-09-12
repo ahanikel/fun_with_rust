@@ -576,7 +576,6 @@ pub fn opcode_from_instruction_and_mode(inst: Instruction, mode: AddrMode) -> u8
     ].iter().position(|(i, m)| inst == *i && mode == *m).unwrap_or(0).try_into().unwrap_or(0)
 }
 
-#[allow(unused)]
 /**
  * Returns the code for a line of the form "XXX #$nn", "XXX $nnnn", "XXX $nn", "XXX $nnnn,X" etc.
  */
@@ -659,5 +658,10 @@ mod test {
         assert_eq!(vec![0x0a], asm("ASL", 0).unwrap_or_else(|e| panic!("{:?}", e)));
         assert_eq!(vec![0xf0, 0x02], asm("BEQ $BBCC", 0xbbc8).unwrap_or_else(|e| panic!("{:?}", e)));
         assert_eq!(vec![0xf0, 0xfc], asm("BEQ $BBCC", 0xbbce).unwrap_or_else(|e| panic!("{:?}", e)));
+    }
+
+    #[test]
+    fn test_2() {
+        assert_eq!(vec![169, 2], asm("LDA #$02", 0).unwrap_or_else(|e| panic!("{:?}", e)));
     }
 }

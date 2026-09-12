@@ -308,7 +308,7 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
                             KeyCode::Comma => (5, 7),
                             // KeyCode::(£) ignored
                             KeyCode::NumpadStar => (6, 1), // (*)
-                            KeyCode::Semicolon => (6, 2),  // (;)
+                            //KeyCode::Semicolon => (6, 2),  // (;)
                             KeyCode::Backquote => (6, 3),  // (HOME)
                             KeyCode::ShiftRight => (6, 4),
                             KeyCode::IntlRo => (6, 5), // (=)

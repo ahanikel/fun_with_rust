@@ -1,0 +1,121 @@
+#![cfg(test)]
+/*
+2026-09-06T09:55:07.809137Z  INFO heap: 0b00100101 a:30 x:05 y:00 0xFCEF STX $D016
+2026-09-06T09:55:07.809260Z  INFO heap: 0b00100101 a:30 x:05 y:00 0xFCF2 JSR $FDA3
+2026-09-06T09:55:07.809431Z  INFO heap: 0b00100101 a:30 x:05 y:00 0xFDA3 LDA #$7F
+2026-09-06T09:55:07.809482Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDA5 STA $DC0D
+2026-09-06T09:55:07.809596Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDA8 STA $DD0D
+2026-09-06T09:55:07.809707Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDAB STA $DC00
+2026-09-06T09:55:07.809819Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDAE LDA #$08
+2026-09-06T09:55:07.809869Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB0 STA $DC0E
+2026-09-06T09:55:07.809977Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB3 STA $DD0E
+2026-09-06T09:55:07.810112Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB6 STA $DC0F
+2026-09-06T09:55:07.810240Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB9 STA $DD0F
+2026-09-06T09:55:07.810356Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDBC LDX #$00
+2026-09-06T09:55:07.810412Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDBE STX $DC03
+2026-09-06T09:55:07.810519Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDC1 STX $DD03
+2026-09-06T09:55:07.810629Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDC4 STX $D418
+2026-09-06T09:55:07.810745Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDC7 DEX
+2026-09-06T09:55:07.810793Z  INFO heap: 0b10100101 a:08 x:FF y:00 0xFDC8 STX $DC02
+2026-09-06T09:55:07.810903Z  INFO heap: 0b10100101 a:08 x:FF y:00 0xFDCB LDA #$07
+2026-09-06T09:55:07.810964Z  INFO heap: 0b00100101 a:07 x:FF y:00 0xFDCD STA $DD00
+2026-09-06T09:55:07.811083Z  INFO heap: 0b00100101 a:07 x:FF y:00 0xFDD0 LDA #$3F
+2026-09-06T09:55:07.811137Z  INFO heap: 0b00100101 a:3F x:FF y:00 0xFDD2 STA $DD02
+2026-09-06T09:55:07.811298Z  INFO heap: 0b00100101 a:3F x:FF y:00 0xFDD5 LDA #$E7
+2026-09-06T09:55:07.811365Z  INFO heap: 0b10100101 a:E7 x:FF y:00 0xFDD7 STA $01
+2026-09-06T09:55:07.811446Z  INFO heap: 0b10100101 a:E7 x:FF y:00 0xFDD9 LDA #$2F
+2026-09-06T09:55:07.811505Z  INFO heap: 0b00100101 a:2F x:FF y:00 0xFDDB STA $00
+2026-09-06T09:55:07.811583Z  INFO heap: 0b00100101 a:2F x:FF y:00 0xFDDD LDA $02A6
+2026-09-06T09:55:07.811690Z  INFO heap: 0b00100111 a:00 x:FF y:00 0xFDE0 BEQ $FDEC
+2026-09-06T09:55:07.811773Z  INFO heap: 0b00100111 a:00 x:FF y:00 0xFDEC LDA #$95
+2026-09-06T09:55:07.811823Z  INFO heap: 0b10100101 a:95 x:FF y:00 0xFDEE STA $DC04
+2026-09-06T09:55:07.811932Z  INFO heap: 0b10100101 a:95 x:FF y:00 0xFDF1 LDA #$42
+2026-09-06T09:55:07.811980Z  INFO heap: 0b00100101 a:42 x:FF y:00 0xFDF3 STA $DC05
+2026-09-06T09:55:07.812088Z  INFO heap: 0b00100101 a:42 x:FF y:00 0xFDF6 JMP $FF6E
+2026-09-06T09:55:07.812201Z  INFO heap: 0b00100101 a:42 x:FF y:00 0xFF6E LDA #$81
+2026-09-06T09:55:07.812250Z  INFO heap: 0b10100101 a:81 x:FF y:00 0xFF70 STA $DC0D
+2026-09-06T09:55:07.812376Z  INFO heap: 0b10100101 a:81 x:FF y:00 0xFF73 LDA $DC0E
+2026-09-06T09:55:07.812491Z  INFO heap: 0b00100101 a:08 x:FF y:00 0xFF76 AND #$80
+2026-09-06T09:55:07.812538Z  INFO heap: 0b00100111 a:00 x:FF y:00 0xFF78 ORA #$11
+2026-09-06T09:55:07.812598Z  INFO heap: 0b00100101 a:11 x:FF y:00 0xFF7A STA $DC0E
+ */
+
+/* only the CIA1 part:
+2026-09-06T09:55:07.809137Z  INFO heap: 0b00100101 a:30 x:05 y:00 0xFCEF STX $D016
+2026-09-06T09:55:07.809431Z  INFO heap: 0b00100101 a:30 x:05 y:00 0xFDA3 LDA #$7F
+2026-09-06T09:55:07.809482Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDA5 STA $DC0D
+2026-09-06T09:55:07.809707Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDAB STA $DC00
+2026-09-06T09:55:07.809819Z  INFO heap: 0b00100101 a:7F x:05 y:00 0xFDAE LDA #$08
+2026-09-06T09:55:07.809869Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB0 STA $DC0E
+2026-09-06T09:55:07.810112Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDB6 STA $DC0F
+2026-09-06T09:55:07.810356Z  INFO heap: 0b00100101 a:08 x:05 y:00 0xFDBC LDX #$00
+2026-09-06T09:55:07.810412Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDBE STX $DC03
+2026-09-06T09:55:07.810745Z  INFO heap: 0b00100111 a:08 x:00 y:00 0xFDC7 DEX
+2026-09-06T09:55:07.810793Z  INFO heap: 0b10100101 a:08 x:FF y:00 0xFDC8 STX $DC02
+2026-09-06T09:55:07.811773Z  INFO heap: 0b00100111 a:00 x:FF y:00 0xFDEC LDA #$95
+2026-09-06T09:55:07.811823Z  INFO heap: 0b10100101 a:95 x:FF y:00 0xFDEE STA $DC04
+2026-09-06T09:55:07.811932Z  INFO heap: 0b10100101 a:95 x:FF y:00 0xFDF1 LDA #$42
+2026-09-06T09:55:07.811980Z  INFO heap: 0b00100101 a:42 x:FF y:00 0xFDF3 STA $DC05
+2026-09-06T09:55:07.812201Z  INFO heap: 0b00100101 a:42 x:FF y:00 0xFF6E LDA #$81
+2026-09-06T09:55:07.812250Z  INFO heap: 0b10100101 a:81 x:FF y:00 0xFF70 STA $DC0D
+2026-09-06T09:55:07.812376Z  INFO heap: 0b10100101 a:81 x:FF y:00 0xFF73 LDA $DC0E
+2026-09-06T09:55:07.812491Z  INFO heap: 0b00100101 a:08 x:FF y:00 0xFF76 AND #$80
+2026-09-06T09:55:07.812538Z  INFO heap: 0b00100111 a:00 x:FF y:00 0xFF78 ORA #$11
+2026-09-06T09:55:07.812598Z  INFO heap: 0b00100101 a:11 x:FF y:00 0xFF7A STA $DC0E
+ */
+
+use std::{cell::RefCell, rc::Rc};
+use tracing::info;
+
+use crate::{cpu6502::{cpu::CPU, memory::Memory, model::asm}, video::cia1::Cia1};
+
+#[test]
+fn test_1() {
+    let mut cpu = CPU::new();
+    let mut log_fn = |s: &str| { info!(s) };
+    cpu.log_instructions = Some(&mut log_fn);
+    let mut mem = Memory::new();
+    let cia1 = Rc::new(RefCell::new(Cia1::new()));
+    mem.register_device(cia1.clone(), 0xdc00, 0xdcff);
+    let code = [
+                "LDA #$7F",
+                "STA $DC0D",
+                "STA $DC00",
+                "LDA #$08",
+                "STA $DC0E",
+                "STA $DC0F",
+                "LDX #$00",
+                "STX $DC03",
+                "DEX",
+                "STX $DC02",
+                "LDA #$95",
+                "STA $DC04",
+                "LDA #$42",
+                "STA $DC05",
+                "LDA #$81",
+                "STA $DC0D",
+                "LDA $DC0E",
+                "AND #$80",
+                "ORA #$11",
+                "STA $DC0E",
+    ];
+    let mut origin = 0xa000;
+    for line in code {
+        let bytes = asm(line, origin).unwrap();
+        for byte in bytes {
+            mem.store_memory_byte(origin, byte);
+            origin += 1;
+        }
+    }
+    mem.store_memory_byte(0xfffc, 0x00);
+    mem.store_memory_byte(0xfffd, 0xa0);
+    cpu.reset(&mut mem);
+    for _ in 0..(7+2+3) {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x7f, cia1.borrow().interrupt_ctrl);
+    for _ in 0..3 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x0, cia1.borrow().port_a);
+}

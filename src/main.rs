@@ -1,14 +1,21 @@
-use std::{cell::RefCell, io::Write, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    io::{Write, stdin},
+    path::PathBuf,
+    rc::Rc,
+};
 
+use clap::{Parser, Subcommand};
 use tracing::info;
-use clap::Parser;
 
 use crate::{
     cpu6502::{
-        acia::{Acia, Message},
+        acia::Acia,
         cpu::CPU,
         memory::{Memory, MemoryDevice, MemoryFromFile},
-    }, video::{AppHandler, Video, cia1::Cia1, control::Control},
+        model,
+    },
+    video::{AppHandler, Video, cia1::Cia1, control::Control},
 };
 
 mod cpu6502;
@@ -18,32 +25,55 @@ mod video;
 #[derive(Parser)]
 #[command(name = "emulator", about = "An emulator for the 6502 and the c64")]
 struct CmdArgs {
-    #[arg(long, default_value = "true")]
-    wozmon: bool,
-    #[arg(long, default_value = "false")]
-    c64: bool,
-    #[arg(long, default_value = "test-resources/kernal.901227-03.bin")]
-    kernal: PathBuf,
-    #[arg(long, default_value = "test-resources/basic.901226-01.bin")]
-    basic: PathBuf,
+    #[command(subcommand)]
+    subcommands: Subcommands,
+}
+
+#[derive(Subcommand)]
+enum Subcommands {
+    Wozmon,
+    C64 {
+        #[arg(long, default_value = "test-resources/kernal.901227-03.bin")]
+        kernal: PathBuf,
+        #[arg(long, default_value = "test-resources/basic.901226-01.bin")]
+        basic: PathBuf,
+    },
+    Asm {
+        #[arg(long, short)]
+        file: Option<PathBuf>,
+        #[arg(long, short)]
+        origin: Option<usize>,
+    },
+    Disasm {
+        file: PathBuf,
+        #[arg(long, short)]
+        origin: Option<usize>,
+        end: Option<usize>,
+    },
+    Heap,
 }
 
 fn main() {
     let cmd_args = CmdArgs::parse();
-    if cmd_args.c64 {
-        c64();
-    } else {
-        wozmon();
+    match cmd_args.subcommands {
+        Subcommands::Wozmon => wozmon(),
+        Subcommands::C64 { kernal, basic } => {
+            c64(kernal.to_str().unwrap(), basic.to_str().unwrap())
+        }
+        Subcommands::Asm { file, origin } => {
+            match file {
+                Some(p) => asm(p.to_str(), origin),
+                _ => asm(None, origin),
+            };
+        }
+        Subcommands::Disasm { file, origin, end } => disasm(file.to_str().unwrap(), origin, end),
+        Subcommands::Heap => run_heap(),
     }
 }
 
 fn wozmon() {
     tracing_subscriber::fmt::init();
     info!("Application starting");
-    #[allow(unused)]
-    let mut log_fn = |s: &str| {
-        info!(s);
-    };
     let out_fn = |b: u8| {
         if b == b'\r' {
             std::io::stdout().write_all(b"\n").unwrap(); // Wozmon uses \r for line breaks
@@ -53,9 +83,10 @@ fn wozmon() {
         std::io::stdout().flush().unwrap();
     };
     let mut cpu: CPU = CPU::new();
-    //cpu.log_instructions = Some(&mut log_fn);
     cpu.log_instructions = None;
-    let wozmon = Rc::new(RefCell::new(MemoryFromFile::new( "test-resources/test-image")));
+    let wozmon = Rc::new(RefCell::new(MemoryFromFile::new(
+        "test-resources/test-image",
+    )));
     let acia = Rc::new(RefCell::new(Acia::new(Some(Rc::new(RefCell::new(out_fn))))));
     #[allow(unused)]
     let acia_sender = acia.borrow_mut().start();
@@ -73,31 +104,22 @@ fn wozmon() {
     }
 }
 
-fn c64() {
+fn c64(kernal_file: &str, basic_file: &str) {
     tracing_subscriber::fmt::init();
     info!("Application starting");
-    let out_fn = |b: u8| {
-        if b == b'\r' {
-            std::io::stdout().write_all(b"\n").unwrap();
-        } else {
-            std::io::stdout().write_all(&[b]).unwrap();
-        }
-        std::io::stdout().flush().unwrap();
-    };
     let mut log_fn = |s: &str| {
         info!(s);
     };
     let mut cpu: CPU = CPU::new();
-    //cpu.log_instructions = None;
     cpu.log_instructions = Some(&mut log_fn);
     let mut mem = Memory::new();
     let video_ram = Rc::new(RefCell::new(MemoryDevice::new(0x400)));
     mem.register_device(video_ram, 0x400, 0x7ff);
     let color_ram = Rc::new(RefCell::new(MemoryDevice::new(0x400)));
     mem.register_device(color_ram, 0xd800, 0xdbff);
-    let kernal = Rc::new(RefCell::new(MemoryFromFile::new("test-resources/kernal.901227-03.bin")));
+    let kernal = Rc::new(RefCell::new(MemoryFromFile::new(kernal_file)));
     mem.register_device(kernal, 0xe000, 0xffff);
-    let basic = Rc::new(RefCell::new(MemoryFromFile::new("test-resources/basic.901226-01.bin")));
+    let basic = Rc::new(RefCell::new(MemoryFromFile::new(basic_file)));
     mem.register_device(basic, 0xa000, 0xbfff);
     let control = Rc::new(RefCell::new(Control::new()));
     let video = Video::new(control.clone(), 0x400, 0xd800);
@@ -109,8 +131,7 @@ fn c64() {
     app.run();
 }
 
-#[allow(unused)]
-fn _run_heap() {
+fn run_heap() {
     let mut heap = heap::Heap::new();
     let mut allocs = Vec::new();
     for _ in 0..16383 {
@@ -122,5 +143,49 @@ fn _run_heap() {
     }
     for alloc in allocs.iter().rev() {
         heap.free(*alloc);
+    }
+}
+
+fn disasm(file: &str, origin: Option<usize>, end: Option<usize>) {
+    let mut mem = Memory::new();
+    let mem_file = Rc::new(RefCell::new(MemoryFromFile::new(file)));
+    let org = origin.unwrap_or(0);
+    let len = mem_file.borrow().mem.len();
+    let end = end.unwrap_or(org + len - 3);
+    mem.register_device(mem_file, org, org + len);
+    let mut pc = org;
+    while pc < end {
+        let (s, size) = model::disasm_and_len(pc as u16, &mut mem);
+        println!("{:04X} {}", pc, s);
+        pc += size as usize;
+    }
+}
+
+fn asm(file: Option<&str>, origin: Option<usize>) {
+    let mut file: Box<dyn std::io::BufRead> = match file {
+        Some(f) => Box::new(std::io::BufReader::new(std::fs::File::open(f).unwrap())),
+        None => Box::new(std::io::BufReader::new(stdin())),
+    };
+    let origin = origin.unwrap_or(0);
+    let mut buf = String::new();
+    let mut pc = origin;
+    while let Ok(n) = file.read_line(&mut buf) && n > 3 {
+        let bytes = model::asm(buf.as_str().trim_end(), origin as u16);
+        match bytes {
+            Ok(bytes) => {
+                print!("{:04X} ", pc);
+                for num in &bytes {
+                    print!(" {:02X}", num);
+                }
+                println!();
+                pc += bytes.len();
+            }
+            Err(e) => {
+                eprintln!("asm failed: {}", e);
+                eprintln!("Note that asm is very strict in what it accepts: exactly one space between opcode and argument (if any),");
+                eprintln!("no leading or trailing spaces or newlines.")
+            }
+        }
+        buf.clear();
     }
 }

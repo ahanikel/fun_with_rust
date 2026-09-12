@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell, collections::VecDeque, rc::Rc, sync::{Arc, RwLock, mpsc::{Sender, channel}}, thread::{self, JoinHandle},
+    cell::RefCell, collections::VecDeque, rc::Rc, sync::{Arc, RwLock}, thread::{self, JoinHandle},
 };
 
 use crate::cpu6502::memory::Device;
@@ -12,10 +12,6 @@ pub struct Acia {
     control: u8,
     log_output: Option<Rc<RefCell<dyn FnMut(u8)>>>,
     pub input_thread: Option<JoinHandle<()>>,
-}
-
-pub enum Message {
-    Quit,
 }
 
 #[allow(clippy::type_complexity)]
@@ -31,9 +27,8 @@ impl Acia {
             input_thread: None,
         }
     }
-    pub fn start(&mut self) -> Sender<Message> {
+    pub fn start(&mut self) {
         let input = self.input.clone();
-        let (sender, receiver) = channel();
         if self.stdin_enabled {
             self.input_thread = Some(thread::spawn(move || {
                 info!("ACIA background thread starting.");
@@ -50,14 +45,10 @@ impl Acia {
                             input.write().unwrap().push_back(c);
                         }
                     }
-                    if let Ok(Message::Quit) = receiver.recv_timeout(Duration::from_millis(10)) {
-                        break;
-                    }
                 }
                 info!("ACIA background thread terminating.");
             }))
         };
-        sender
     }
     #[cfg(test)]
     pub fn set_input(&mut self, s: &str) {
@@ -71,6 +62,12 @@ impl Acia {
             }
         }
         self.stdin_enabled = false;
+    }
+}
+
+impl Drop for Acia {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
     }
 }
 

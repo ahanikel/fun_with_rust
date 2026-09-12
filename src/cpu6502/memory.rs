@@ -62,7 +62,7 @@ impl Memory<'_> {
 }
 
 pub struct MemoryFromFile {
-    mem: Vec<u8>,
+    pub mem: Vec<u8>,
 }
 
 impl MemoryFromFile {
