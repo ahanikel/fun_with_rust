@@ -58,6 +58,14 @@ impl Cia1 {
     pub fn step(&mut self) -> bool {
         let mut interrupt = false;
         self.current_time = read_current_time();
+        if self.is_timer_a_load_once() {
+            self.timer_a_value = self.timer_a_latch;
+            self.set_timer_a_load_once(false);
+        }
+        if self.is_timer_b_load_once() {
+            self.timer_b_value = self.timer_b_latch;
+            self.set_timer_b_load_once(false);
+        }
         if self.is_timer_a_started() {
             if self.timer_a_value == 0 {
                 if self.is_timer_a_stopping() {
@@ -87,14 +95,6 @@ impl Cia1 {
             } else {
                 self.timer_b_value -= 1;
             }
-        }
-        if self.is_timer_a_load_once() {
-            self.timer_a_value = self.timer_a_latch;
-            self.set_timer_a_load_once(false);
-        }
-        if self.is_timer_b_load_once() {
-            self.timer_b_value = self.timer_b_latch;
-            self.set_timer_b_load_once(false);
         }
         let now = [self.read(0x8),
         self.read(0x9),

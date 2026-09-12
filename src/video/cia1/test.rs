@@ -110,12 +110,52 @@ fn test_1() {
     mem.store_memory_byte(0xfffc, 0x00);
     mem.store_memory_byte(0xfffd, 0xa0);
     cpu.reset(&mut mem);
-    for _ in 0..(7+2+3) {
+    for _ in 0..13 {
         cpu.step(&mut mem);
     }
-    assert_eq!(0x7f, cia1.borrow().interrupt_ctrl);
-    for _ in 0..3 {
+    assert_eq!(0, cia1.borrow().interrupt_ctrl);
+    for _ in 0..4 {
         cpu.step(&mut mem);
     }
-    assert_eq!(0x0, cia1.borrow().port_a);
+    // active low, all ones = no key pressed
+    assert_eq!(0x7f, cia1.borrow().port_a);
+    for _ in 0..0xc {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x08, cia1.borrow().timer_a_ctrl);
+    assert_eq!(0x08, cia1.borrow().timer_b_ctrl);
+    for _ in 0..6 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x0, cia1.borrow().ddr_b);
+    for _ in 0..6 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0xff, cia1.borrow().ddr_a);
+    for _ in 0..12 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x4295, cia1.borrow().timer_a_latch);
+    assert_eq!(0x4295, cia1.borrow().timer_a_value);
+    assert!(!cia1.borrow().is_timer_a_int_enabled());
+    for _ in 0..6 {
+        cpu.step(&mut mem);
+    }
+    assert!(cia1.borrow().is_timer_a_int_enabled());
+    for _ in 0..10 {
+        cpu.step(&mut mem);
+    }
+    assert!(cia1.borrow().is_timer_a_started());
+    assert!(cia1.borrow().is_timer_a_load_once());
+    cia1.borrow_mut().step();
+    assert!(cia1.borrow().is_timer_a_started());
+    assert!(!cia1.borrow().is_timer_a_load_once());
+    assert_eq!(0x4294, cia1.borrow().timer_a_value);
+    for _ in 0..0x4293 {
+        cia1.borrow_mut().step();
+    }
+    assert_eq!(0x1, cia1.borrow().timer_a_value);
+    assert!(!cia1.borrow_mut().step());
+    assert_eq!(0x0, cia1.borrow().timer_a_value);
+    assert!(cia1.borrow_mut().step());
 }
