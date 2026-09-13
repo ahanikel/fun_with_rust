@@ -86,7 +86,7 @@ impl <'a,'b,'c,'d> CpuBusTransfer<'a,'b,'c,'d> {
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::AbsoluteIndirect,
-            ) => self.load_absolute_indirect_addr(),
+            ) => self.load_absolute_addr(),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPage,
@@ -112,9 +112,11 @@ impl <'a,'b,'c,'d> CpuBusTransfer<'a,'b,'c,'d> {
                 AddrMode::ZeroPageIndirectIndexedWithY,
             ) => self.load_zp_indirect_indexed_with_y_addr(),
             (_, AddrMode::Absolute) => self.load_absolute_byte(),
+            (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_addr(),
             (_, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_byte(),
             (_, AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_byte(),
             (_, AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_byte(),
+            (Instruction::JMP, AddrMode::AbsoluteIndirect) => self.load_absolute_addr(),
             (_, AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_byte(),
             (_, AddrMode::Accumulator) => self.cpu.tmp[0] = self.cpu.a,
             (_, AddrMode::Immediate) => self.load_byte_arg(),
@@ -630,17 +632,14 @@ impl <'a,'b,'c,'d> CpuBusTransfer<'a,'b,'c,'d> {
      * Loads an address from the address pointed at by the argument
      */
     pub fn load_absolute_addr(&mut self) {
-        self.cpu.tmp_addr = self.mem.load_memory_word(self.cpu.tmp_addr);
-    }
-    pub fn load_absolute_indirect_addr(&mut self) {
-        self.load_absolute_addr();
+        self.load_addr_arg();
         self.cpu.tmp_addr = self.mem.load_memory_word(self.cpu.tmp_addr);
     }
     /**
      * Loads a byte from (abs)
      */
     pub fn load_absolute_indirect_byte(&mut self) {
-        self.load_absolute_indirect_addr();
+        self.load_absolute_addr();
         self.cpu.tmp[0] = self.mem.load_memory_byte(self.cpu.tmp_addr);
     }
     pub fn load_absolute_indexed_indirect_addr(&mut self) {

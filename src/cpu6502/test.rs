@@ -594,4 +594,24 @@ fn test_bit() {
     assert_eq!(0xff78, cpu.pc);
 }
 
+#[test]
+fn test_jmp_ind() {
+    let mut cpu = CPU::new();
+    let mut mem = Memory::new();
+    mem.store_memory_word(0xa000, 0xbbbb);
+    let prog = [
+        opcode_from_instruction_and_mode(Instruction::JMP, AddrMode::AbsoluteIndirect),
+        0x00, 0xA0,
+    ];
+    cpu.reset(&mut mem);
+    cpu.pc = 0xff70;
+    for (pos, b) in prog.iter().enumerate() {
+        mem.store_memory_byte(0xff70 + pos as u16, *b);
+    }
+    for _step in 0..12 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0xbbbb, cpu.pc);
+}
+
 mod it;
