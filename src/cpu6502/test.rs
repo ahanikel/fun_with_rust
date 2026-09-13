@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::cpu6502::model::addr_mode::AddrMode;
-use crate::cpu6502::model::opcode_from_instruction_and_mode;
+use crate::cpu6502::model::{asm, asm_into, opcode_from_instruction_and_mode};
 use crate::cpu6502::model::instruction::Instruction;
 use crate::cpu6502::*;
 
@@ -612,6 +612,64 @@ fn test_jmp_ind() {
         cpu.step(&mut mem);
     }
     assert_eq!(0xbbbb, cpu.pc);
+}
+
+#[test]
+fn test_sta_zp() {
+    let mut cpu = CPU::new();
+    let mut mem = Memory::new();
+    let prog = [
+        "LDX #$3C",
+        "LDY #$03",
+        "STX $B2",
+        "STY $B3",
+    ];
+    cpu.reset(&mut mem);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _step in 0..17 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x3c, mem.load_memory_byte(0xb2));
+    assert_eq!(0x03, mem.load_memory_byte(0xb3));
+    assert_eq!(0x033c, mem.load_memory_word(0xb2));
+}
+
+#[test]
+fn test_inc_zp_sta_ind_y() {
+    let mut cpu = CPU::new();
+    let mut mem = Memory::new();
+    let prog = [
+        "LDA #$03",
+        "TAY",
+        "STA $C1",
+        "STA $C2",
+        "INC $C2",
+        "LDA ($C1),Y",
+    ];
+    cpu.reset(&mut mem);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    mem.store_memory_byte(0x0406, 0xee);
+    for _step in 0..23 {
+        cpu.step(&mut mem);
+    }
+    assert_eq!(0x03, mem.load_memory_byte(0xc1));
+    assert_eq!(0x04, mem.load_memory_byte(0xc2));
+    assert_eq!(0x0403, mem.load_memory_word(0xc1));
+    assert_eq!(0xee, cpu.a);
 }
 
 mod it;

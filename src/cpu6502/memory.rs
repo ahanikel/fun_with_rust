@@ -59,6 +59,13 @@ impl Memory<'_> {
     pub fn get_range(&self, range: Range<usize>) -> &[u8] {
         &self.mem[range]
     }
+    #[cfg(test)]
+    // Note: this does not work for devices
+    pub fn set_range(&mut self, range: Range<usize>, src: Vec<u8>) {
+        let mem = &mut self.mem[range.clone()];
+        let src = &src[..range.end - range.start];
+        mem.copy_from_slice(src);
+    }
 }
 
 pub struct MemoryFromFile {

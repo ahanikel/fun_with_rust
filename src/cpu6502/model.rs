@@ -581,6 +581,11 @@ pub fn opcode_from_instruction_and_mode(inst: Instruction, mode: AddrMode) -> u8
  */
 pub fn asm(s: &str, origin: u16) -> anyhow::Result<Vec<u8>> {
     let mut res = Vec::new();
+    asm_into(s, origin, &mut res)?;
+    Ok(res)
+}
+
+pub fn asm_into(s: &str, origin: u16, res: &mut Vec<u8>) -> anyhow::Result<()> {
     let inst = &s[0..3].to_ascii_uppercase();
     let inst = Instruction::from_str(inst)?;
     let AddrModeWithAddr{mode, arg, arg_size} = 
@@ -645,7 +650,7 @@ pub fn asm(s: &str, origin: u16) -> anyhow::Result<Vec<u8>> {
     if arg_size > 1 {
         res.push(arg[1]);
     }
-    Ok(res)
+    Ok(())
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ mod test;
 
 use cpu::{CPU, StatusFlag};
 use model::instruction_and_mode;
+use tracing::info;
 
 use crate::cpu6502::{memory::Memory, model::addr_mode::CpuBusTransfer};
 
@@ -68,13 +69,16 @@ impl CPU<'_> {
                 }
             }
         }
-        if self.cycle == 0 && self.irq && self.is_clear(StatusFlag::IRQDisable) {
-            let mut bus_transfer = CpuBusTransfer::new(self, mem);
-            bus_transfer.stack_push_pc(2);
-            bus_transfer.stack_push_flags();
-            self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
-            self.pc = mem.load_memory_word(0xfffe);
-            self.cycles = 7;
+        if self.cycle == 0 && self.irq {
+            if self.is_clear(StatusFlag::IRQDisable) {
+                let mut bus_transfer = CpuBusTransfer::new(self, mem);
+                bus_transfer.stack_push_pc(2);
+                bus_transfer.stack_push_flags();
+                self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
+                self.pc = mem.load_memory_word(0xfffe);
+                self.cycles = 7;
+                info!("Starting interrupt handler at {:04X}", &self.pc)
+            }
             self.irq = false;
             return;
         }

@@ -163,6 +163,7 @@ pub struct AppHandler<'a, 'b, 'c> {
     video: Video<'b>,
     mem: Memory<'c>,
     cia1: Cia1,
+    pseudo_pixel_counter: usize,
 }
 
 impl<'a, 'b, 'c> AppHandler<'a, 'b, 'c> {
@@ -172,6 +173,7 @@ impl<'a, 'b, 'c> AppHandler<'a, 'b, 'c> {
             video,
             mem,
             cia1,
+            pseudo_pixel_counter: 0,
         }
     }
     pub fn run(&mut self) {
@@ -205,8 +207,9 @@ impl<'a, 'b, 'c> AppHandler<'a, 'b, 'c> {
                 .video
                 .do_blank_screen(regs.borrow().get_border_color()),
         }
-    }
+    } 
 }
+
 impl ApplicationHandler for AppHandler<'_, '_, '_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let regs = self.video.regs.clone();
@@ -346,9 +349,13 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         self.cpu.step(&mut self.mem);
         let regs_ = self.video.regs.clone();
         let mut regs = regs_.borrow_mut();
-        regs.inc_current_raster_line();
+        self.pseudo_pixel_counter += 1;
+        if self.pseudo_pixel_counter == self.video.system.x_max {
+            self.pseudo_pixel_counter = 0;
+            regs.inc_current_raster_line();
+        }
         let current_raster_line = regs.get_current_raster_line();
-        if current_raster_line % 20000 == 0 {
+        if current_raster_line as usize % (20000 / self.video.system.x_max) == 0 {
             if let Some(w) = &mut self.video.window {
                 w.request_redraw();
             }
