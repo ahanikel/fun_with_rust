@@ -3,8 +3,9 @@ name = "emulator"
 version = "0.1.0"
 edition = "2024"
 
-[profile.release]
+[profile.dev]
 debug = true
+opt-level = 0
 
 [dependencies]
 anyhow = "1.0.104"
@@ -15,5 +16,5 @@ pixels = "0.17.2"
 rand = "0.10.2"
 strum = { version = "0.28.0", features = ["derive"] }
 tracing = "0.1.44"
-tracing-subscriber = "0.3.23"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
 winit = "0.30.13"
