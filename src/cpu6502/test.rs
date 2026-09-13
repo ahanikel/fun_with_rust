@@ -68,9 +68,8 @@ fn test_beq_taken() {
     mem.store_memory_byte(0xaaab, 0xc0);
     cpu.reset(&mut mem);
     cpu.set_flag(StatusFlag::Zero);
-    for step in 0..10 {
+    for _step in 0..10 {
         cpu.step(&mut mem);
-        println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(0, cpu.cycle);
     assert_eq!(0xaa6c, cpu.pc);
@@ -86,8 +85,7 @@ fn test_beq_not_taken() {
     mem.store_memory_byte(0xaaab, 0xc0);
     cpu.reset(&mut mem);
     cpu.clear_flag(StatusFlag::Zero);
-    for step in 0..9 {
-        print!("Step {step}: ");
+    for _step in 0..9 {
         cpu.step(&mut mem);
     }
     assert_eq!(0, cpu.cycle);
@@ -107,8 +105,7 @@ fn test_cmp_zpx_ind_lt() {
     mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
     mem.store_memory_byte(0x1001, 0x4f);
     mem.store_memory_byte(0x9999, 0xf0);
-    for step in 0..13 {
-        print!("Step {step}: ");
+    for _step in 0..13 {
         cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::Negative));
@@ -129,8 +126,7 @@ fn test_cmp_zpx_ind_eq() {
     mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
     mem.store_memory_byte(0x1001, 0x4f);
     mem.store_memory_byte(0x9999, 0x55);
-    for step in 0..13 {
-        print!("Step {step}: ");
+    for _step in 0..13 {
         cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
@@ -151,8 +147,7 @@ fn test_cmp_zpx_ind_gt() {
     mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
     mem.store_memory_byte(0x1001, 0x4f);
     mem.store_memory_byte(0x9999, 0x55);
-    for step in 0..13 {
-        print!("Step {step}: ");
+    for _step in 0..13 {
         cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
@@ -187,9 +182,8 @@ fn _test_sbc(
     for (pos, b) in prog.iter().enumerate() {
         mem.store_memory_byte(0x1000 + pos as u16, *b);
     }
-    for step in 0..14 {
+    for _step in 0..14 {
         cpu.step(&mut mem);
-        println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(
         expected_res, cpu.a,
@@ -346,9 +340,8 @@ fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_c
     for (pos, b) in prog.iter().enumerate() {
         mem.store_memory_byte(0x1000 + pos as u16, *b);
     }
-    for step in 0..14 {
+    for _step in 0..14 {
         cpu.step(&mut mem);
-        println!("Step {step}: {}", cpu.status_line);
     }
     assert_eq!(
         expected_res, cpu.a,
@@ -510,14 +503,12 @@ fn test_cmp_sbc_1() {
         mem.store_memory_byte(0x0025, 0);
         mem.store_memory_byte(0x0028, mem_0x28);
         mem.store_memory_byte(0x0029, 0);
-        for step in 0..21 {
+        for _step in 0..21 {
             cpu.step(&mut mem);
-            println!("Step {step}: {}", cpu.status_line);
         }
         match mem_0x28 {
             0 => {
                 cpu.step(&mut mem);
-                println!("Step 21: {}", cpu.status_line);
                 assert!(cpu.is_set(StatusFlag::Carry));
                 assert!(cpu.is_set(StatusFlag::Zero));
                 assert!(cpu.is_clear(StatusFlag::Negative));
@@ -568,8 +559,7 @@ fn test_cmp_sbc_2() {
     mem.store_memory_byte(0x0025, 0xff);
     mem.store_memory_byte(0x0028, 0x01);
     mem.store_memory_byte(0x0029, 0xff);
-    for step in 0..21 {
-        println!("Step {step}: {}", cpu.status_line);
+    for _step in 0..21 {
         cpu.step(&mut mem);
     }
     assert!(cpu.is_clear(StatusFlag::Carry));
@@ -597,8 +587,7 @@ fn test_bit() {
     for (pos, b) in prog.iter().enumerate() {
         mem.store_memory_byte(0xff70 + pos as u16, *b);
     }
-    for step in 0..17 {
-        println!("Step {step}: {}", cpu.status_line);
+    for _step in 0..17 {
         cpu.step(&mut mem);
     }
     assert!(cpu.is_set(StatusFlag::Overflow));
