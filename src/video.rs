@@ -15,10 +15,7 @@ use winit::{
 };
 
 use crate::{
-    cpu6502::{
-        cpu::CPU,
-        memory::Memory,
-    },
+    cpu6502::{cpu::CPU, memory::Memory},
     video::{
         char_rom::CHARS,
         cia1::Cia1,
@@ -200,14 +197,12 @@ impl<'a, 'b, 'c> AppHandler<'a, 'b, 'c> {
                     }
                 }
             }
-            (ScreenState::On, ScreenMode::Bitmap) => self
-                .video
-                .do_blank_screen(regs.borrow().get_border_color()),
-            (ScreenState::Off, _) => self
-                .video
-                .do_blank_screen(regs.borrow().get_border_color()),
+            (ScreenState::On, ScreenMode::Bitmap) => {
+                self.video.do_blank_screen(regs.borrow().get_border_color())
+            }
+            (ScreenState::Off, _) => self.video.do_blank_screen(regs.borrow().get_border_color()),
         }
-    } 
+    }
 }
 
 impl ApplicationHandler for AppHandler<'_, '_, '_> {
@@ -236,8 +231,7 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
                 .unwrap(),
             )
         };
-        self.video
-            .do_blank_screen(regs.borrow().get_border_color());
+        self.video.do_blank_screen(regs.borrow().get_border_color());
         self.redraw_screen();
         window.request_redraw();
         self.video.window = Some(window);
@@ -312,7 +306,7 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
                             // KeyCode::(£) ignored
                             KeyCode::NumpadStar => (6, 1), // (*)
                             //KeyCode::Semicolon => (6, 2),  // (;)
-                            KeyCode::Backquote => (6, 3),  // (HOME)
+                            KeyCode::Backquote => (6, 3), // (HOME)
                             KeyCode::ShiftRight => (6, 4),
                             KeyCode::IntlRo => (6, 5), // (=)
                             // KeyCode::(up) ignored
@@ -348,20 +342,24 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         }
         self.cpu.step(&mut self.mem);
         let regs_ = self.video.regs.clone();
-        let mut regs = regs_.borrow_mut();
-        self.pseudo_pixel_counter += 1;
-        if self.pseudo_pixel_counter == self.video.system.x_max {
-            self.pseudo_pixel_counter = 0;
-            regs.inc_current_raster_line();
+        {
+            let mut regs = regs_.borrow_mut();
+            self.pseudo_pixel_counter += 1;
+            if self.pseudo_pixel_counter == self.video.system.x_max {
+                self.pseudo_pixel_counter = 0;
+                regs.inc_current_raster_line();
+            }
         }
-        let current_raster_line = regs.get_current_raster_line();
+        let current_raster_line = self.video.regs.borrow().get_current_raster_line();
         if current_raster_line as usize % (20000 / self.video.system.x_max) == 0 {
+            self.redraw_screen();
             if let Some(w) = &mut self.video.window {
                 w.request_redraw();
             }
         }
-        if regs.is_raster_interrupt_enabled() && current_raster_line
-            == regs.get_raster_interrupt_at_line()
+        let mut regs = self.video.regs.borrow_mut();
+        if regs.is_raster_interrupt_enabled()
+            && current_raster_line == regs.get_raster_interrupt_at_line()
         {
             regs.set_source_is_raster_interrupt();
             self.cpu.request_interrupt();
