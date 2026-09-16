@@ -33,10 +33,12 @@ struct CmdArgs {
 enum Subcommands {
     Wozmon,
     C64 {
-        #[arg(long, default_value = "test-resources/kernal.901227-03.bin")]
+        #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
         kernal: PathBuf,
-        #[arg(long, default_value = "test-resources/basic.901226-01.bin")]
+        #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
         basic: PathBuf,
+        #[arg(short, long)]
+        verbose: bool,
     },
     Asm {
         #[arg(long, short)]
@@ -57,8 +59,8 @@ fn main() {
     let cmd_args = CmdArgs::parse();
     match cmd_args.subcommands {
         Subcommands::Wozmon => wozmon(),
-        Subcommands::C64 { kernal, basic } => {
-            c64(kernal.to_str().unwrap(), basic.to_str().unwrap())
+        Subcommands::C64 { kernal, basic, verbose } => {
+            c64(kernal.to_str().unwrap(), basic.to_str().unwrap(), verbose)
         }
         Subcommands::Asm { file, origin } => {
             match file {
@@ -104,14 +106,16 @@ fn wozmon() {
     }
 }
 
-fn c64(kernal_file: &str, basic_file: &str) {
+fn c64(kernal_file: &str, basic_file: &str, verbose: bool) {
     tracing_subscriber::fmt::init();
     info!("Application starting");
     let mut log_fn = |s: &str| {
         info!(s);
     };
     let mut cpu: CPU = CPU::new();
-    cpu.log_instructions = Some(&mut log_fn);
+    if verbose {
+        cpu.log_instructions = Some(&mut log_fn);
+    }
     let mut mem = Memory::new();
     let video_ram = Rc::new(RefCell::new(MemoryDevice::new(0x400)));
     mem.register_device(video_ram, 0x400, 0x7ff);

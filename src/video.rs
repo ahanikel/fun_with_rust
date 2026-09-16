@@ -344,14 +344,12 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         let regs_ = self.video.regs.clone();
         {
             let mut regs = regs_.borrow_mut();
-            self.pseudo_pixel_counter += 1;
-            if self.pseudo_pixel_counter == self.video.system.x_max {
-                self.pseudo_pixel_counter = 0;
+            self.pseudo_pixel_counter = self.pseudo_pixel_counter.wrapping_add(1);
+            if self.pseudo_pixel_counter % self.video.system.x_max == 0 {
                 regs.inc_current_raster_line();
             }
         }
-        let current_raster_line = self.video.regs.borrow().get_current_raster_line();
-        if current_raster_line as usize % (20000 / self.video.system.x_max) == 0 {
+        if self.pseudo_pixel_counter % 20000 == 0 {
             self.redraw_screen();
             if let Some(w) = &mut self.video.window {
                 w.request_redraw();
@@ -359,7 +357,7 @@ impl ApplicationHandler for AppHandler<'_, '_, '_> {
         }
         let mut regs = self.video.regs.borrow_mut();
         if regs.is_raster_interrupt_enabled()
-            && current_raster_line == regs.get_raster_interrupt_at_line()
+            && regs.get_current_raster_line() == regs.get_raster_interrupt_at_line()
         {
             regs.set_source_is_raster_interrupt();
             self.cpu.request_interrupt();

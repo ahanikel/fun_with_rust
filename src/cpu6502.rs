@@ -106,7 +106,8 @@ impl CPU<'_> {
         } else if self.cycle == self.cycles - 1 {
             self.cycle = 0;
         } else {
-            self.cycle += 1;
+            //self.cycle += 1;
+            self.cycle = 0;
         }
     }
 }
