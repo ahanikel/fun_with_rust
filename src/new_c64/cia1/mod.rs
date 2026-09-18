@@ -95,10 +95,6 @@ impl Cia1 {
                 self.timer_b_value -= 1;
             }
         }
-        self.current_time = [self.read(0x8),
-        self.read(0x9),
-        self.read(0xa),
-        self.read(0xb)];
         if self.is_alarm_enabled() && !self.alarm_triggered && time_has_reached_alarm(self.current_time, self.alarm_time) {
             interrupt = true;
             self.set_alarm_triggered();

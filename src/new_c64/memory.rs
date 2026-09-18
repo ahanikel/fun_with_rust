@@ -53,12 +53,16 @@ impl Memory {
                 // IO (Video, SID, CIA1, CIA2)
                 if addr < 0xd400 {
                     video.read((addr - 0xd000) % 0x40)
+                } else if addr < 0xd800 {
+                    // SID, not yet implemented
+                    self.mem[addr as usize]
                 } else if addr < 0xdc00 {
+                    // Color RAM
                     self.mem[addr as usize]
                 } else if addr < 0xdd00 {
                     cia1.read((addr - 0xdc00) % 0x10)
                 } else if addr < 0xde00 {
-                    //self.cia2.write((addr - 0xdc00) % 0x10, byte);
+                    //cia2.read((addr - 0xdd00) % 0x10)
                     self.mem[addr as usize]
                 } else {
                     // IO Area #1 and #2
@@ -96,6 +100,12 @@ impl Memory {
                 // IO (Video, SID, CIA1, CIA2)
                 if addr < 0xd400 {
                     video.write((addr - 0xd000) % 0x40, byte);
+                } else if addr < 0xd800 {
+                    // SID, not implemented yet
+                    self.mem[addr as usize] = byte;
+                } else if addr < 0xdc00 {
+                    // Color RAM
+                    self.mem[addr as usize] = byte;
                 } else if addr < 0xdd00 {
                     cia1.write((addr - 0xdc00) % 0x10, byte);
                 } else if addr < 0xde00 {

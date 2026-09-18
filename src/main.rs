@@ -65,6 +65,7 @@ enum Subcommands {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     let cmd_args = CmdArgs::parse();
     match cmd_args.subcommands {
         Subcommands::Wozmon => wozmon(),
@@ -86,7 +87,6 @@ fn main() {
 }
 
 fn wozmon() {
-    tracing_subscriber::fmt::init();
     info!("Application starting");
     let out_fn = |b: u8| {
         if b == b'\r' {
@@ -119,7 +119,6 @@ fn wozmon() {
 }
 
 fn c64(kernal_file: &str, basic_file: &str, verbose: bool) {
-    tracing_subscriber::fmt::init();
     info!("Application starting");
     let mut log_fn = |s: &str| {
         info!(s);

@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::ops::Range;
 
 use crate::new_c64::video::C64Colour;

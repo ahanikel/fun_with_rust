@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub mod addr_mode;
 pub mod instruction;
 
