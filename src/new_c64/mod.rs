@@ -3,62 +3,19 @@
 mod char_rom;
 mod memory;
 mod cpu;
+mod video;
+mod cia1;
+mod app_handler;
 
-use std::{io::Read, path::PathBuf};
+use std::{io::Read, path::{Path, PathBuf}};
 
-pub fn c64(kernal: PathBuf, basic: PathBuf, verbose: bool) {
+use crate::new_c64::{app_handler::AppHandler, cia1::Cia1, cpu::Cpu, memory::Memory, video::Video};
 
-}
-
-struct Oscillator {
-    cpu: cpu::Cpu,
-    video: Video,
-    memory: memory::Memory,
-}
-
-impl Oscillator {
-    fn start() {}
-    fn stop() {}
-    fn trigger() {}
-}
-
-struct Video;
-
-impl Video {
-    fn reset() {}
-    fn trigger() {}
-}
-
-#[derive(Default, Debug)]
-struct Cia1 {
-    timer_a_val: u16,
-    timer_a_cnt: u16,
-    timer_a_int: bool,
-    timer_b_val: u16,
-    timer_b_cnt: u16,
-    timer_b_int: bool,
-}
-
-impl Cia1 {
-    fn new() -> Self {
-        Self::default()
-    }
-    fn reset() {}
-    fn set_timer_a(value: u16) {
-
-    }
-}
-
-struct Cia2;
-
-struct Sid;
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_cia1_default() {
-        let cia1 = Cia1::new();
-        dbg!(cia1);
-    }
+pub fn c64(kernal: &Path, basic: &Path, verbose: bool) {
+    let cpu = Cpu::new(true);
+    let video = Video::default();
+    let mem = Memory::new(kernal, basic);
+    let cia1 = Cia1::new();
+    let mut app = AppHandler::new(cpu, video, mem, cia1);
+    app.run();
 }

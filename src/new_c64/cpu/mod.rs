@@ -4,7 +4,7 @@ mod execute;
 
 use tracing::info;
 
-use crate::new_c64::cpu::{execute::Execution, model::instruction_and_mode};
+use crate::new_c64::{cia1::{self, Cia1}, cpu::{execute::Execution, model::instruction_and_mode}, video::Video};
 
 use super::memory::Memory;
 
@@ -76,8 +76,8 @@ impl Cpu {
     fn trigger() {}
     fn interrupt() {}
     fn nmi() {}
-    pub fn reset(&mut self, mem: &Memory) {
-        self.pc = mem.read_word(0xfffc);
+    pub fn reset(&mut self, mem: &Memory, video: &Video, cia1: &Cia1) {
+        self.pc = mem.read_word(video, cia1, 0xfffc);
         self.st = StatusFlags(32);
         self.irq = false;
         self.nmi = false;
@@ -171,7 +171,7 @@ impl Cpu {
         self.set_or_clear_flag(flag, val != 0);
     }
 
-    pub fn step(&mut self, mem: &mut Memory) {
+    pub fn step(&mut self, mem: &mut Memory, video: &mut Video, cia1: &mut Cia1) {
         if self.reset {
             match self.cycle {
                 7 => {
@@ -187,10 +187,10 @@ impl Cpu {
         if self.cycle == 0 && self.irq {
             if self.is_clear(StatusFlag::IRQDisable) {
                 let mut execution = Execution::new(self, mem);
-                execution.stack_push_pc(2);
-                execution.stack_push_flags();
+                execution.stack_push_pc(2, video, cia1);
+                execution.stack_push_flags(video, cia1);
                 self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
-                self.pc = mem.read_word(0xfffe);
+                self.pc = mem.read_word(video, cia1, 0xfffe);
                 self.cycles = 7;
                 info!("Starting interrupt handler at {:04X}", &self.pc)
             }
@@ -198,7 +198,7 @@ impl Cpu {
             return;
         }
         if self.cycle == 0 {
-            let opcode = mem.read(self.pc);
+            let opcode = mem.read(video, cia1, self.pc);
             if self.log_instructions {
                 self.status_line = format!(
                     "0b{:08b} a:{:02X} x:{:02X} y:{:02X} 0x{:04X} {}",
@@ -207,16 +207,16 @@ impl Cpu {
                     self.x,
                     self.y,
                     self.pc,
-                    model::disasm(self.pc, mem)
+                    model::disasm(self.pc, mem, video, cia1)
                 );
                 info!("{}", &self.status_line);
             }
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;
             let mut execution = Execution::new(self, mem);
-            execution.run_load(inst, mode);
-            execution.run_instruction(inst);
-            execution.run_store(inst, mode);
+            execution.run_load(inst, mode, video, cia1);
+            execution.run_instruction(inst, video, cia1);
+            execution.run_store(inst, mode, video, cia1);
             self.cycle += 1;
         } else if self.cycle == self.cycles - 1 {
             self.cycle = 0;

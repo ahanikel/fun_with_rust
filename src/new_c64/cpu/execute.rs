@@ -1,4 +1,4 @@
-use crate::new_c64::{cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, instruction::Instruction}}, memory::Memory};
+use crate::{cpu6502::video, new_c64::{cia1::Cia1, cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, instruction::Instruction}}, memory::Memory, video::Video}};
 
 pub struct Execution<'a,'b> {
     cpu: &'a mut Cpu,
@@ -9,76 +9,76 @@ impl <'a,'b> Execution<'a,'b> {
     pub fn new(cpu: &'a mut Cpu, mem: &'b mut Memory) -> Self {
         Execution { cpu, mem }
     }
-    pub fn run_load(&mut self, inst: Instruction, mode: AddrMode) {
+    pub fn run_load(&mut self, inst: Instruction, mode: AddrMode, video: &Video, cia1: &Cia1) {
         match (inst, mode) {
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::Absolute,
-            ) => self.load_addr_arg(),
+            ) => self.load_addr_arg(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::AbsoluteIndexedIndirect,
-            ) => self.load_absolute_indexed_indirect_addr(),
+            ) => self.load_absolute_indexed_indirect_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::AbsoluteIndexedWithX,
-            ) => self.load_absolute_indexed_with_x_addr(),
+            ) => self.load_absolute_indexed_with_x_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::AbsoluteIndexedWithY,
-            ) => self.load_absolute_indexed_with_y_addr(),
+            ) => self.load_absolute_indexed_with_y_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::AbsoluteIndirect,
-            ) => self.load_absolute_addr(),
+            ) => self.load_absolute_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPage,
-            ) => self.load_zp_arg(),
+            ) => self.load_zp_arg(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPageIndexedIndirect,
-            ) => self.load_zp_indexed_indirect_addr(),
+            ) => self.load_zp_indexed_indirect_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPageIndexedWithX,
-            ) => self.load_zp_indexed_with_x_addr(),
+            ) => self.load_zp_indexed_with_x_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPageIndexedWithY,
-            ) => self.load_zp_indexed_with_y_addr(),
+            ) => self.load_zp_indexed_with_y_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPageIndirect,
-            ) => self.load_zp_indirect_addr(),
+            ) => self.load_zp_indirect_addr(video, cia1),
             (
                 Instruction::STA | Instruction::STX | Instruction::STY | Instruction::STZ,
                 AddrMode::ZeroPageIndirectIndexedWithY,
-            ) => self.load_zp_indirect_indexed_with_y_addr(),
-            (_, AddrMode::Absolute) => self.load_absolute_byte(),
-            (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_addr(),
-            (_, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_byte(),
-            (_, AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_byte(),
-            (_, AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_byte(),
-            (Instruction::JMP, AddrMode::AbsoluteIndirect) => self.load_absolute_addr(),
-            (_, AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_byte(),
+            ) => self.load_zp_indirect_indexed_with_y_addr(video, cia1),
+            (_, AddrMode::Absolute) => self.load_absolute_byte(video, cia1),
+            (Instruction::JMP, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_addr(video, cia1),
+            (_, AddrMode::AbsoluteIndexedIndirect) => self.load_absolute_indexed_indirect_byte(video, cia1),
+            (_, AddrMode::AbsoluteIndexedWithX) => self.load_absolute_indexed_with_x_byte(video, cia1),
+            (_, AddrMode::AbsoluteIndexedWithY) => self.load_absolute_indexed_with_y_byte(video, cia1),
+            (Instruction::JMP, AddrMode::AbsoluteIndirect) => self.load_absolute_addr(video, cia1),
+            (_, AddrMode::AbsoluteIndirect) => self.load_absolute_indirect_byte(video, cia1),
             (_, AddrMode::Accumulator) => self.cpu.tmp[0] = self.cpu.a,
-            (_, AddrMode::Immediate) => self.load_byte_arg(),
+            (_, AddrMode::Immediate) => self.load_byte_arg(video, cia1),
             (_, AddrMode::Implied) => {}
             (_, AddrMode::Relative) => {}
-            (_, AddrMode::ZeroPage) => self.load_zp_byte(),
-            (_, AddrMode::ZeroPageIndexedIndirect) => self.load_zp_indexed_indirect_byte(),
-            (_, AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_byte(),
-            (_, AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_byte(),
-            (_, AddrMode::ZeroPageIndirect) => self.load_zp_indirect_byte(),
+            (_, AddrMode::ZeroPage) => self.load_zp_byte(video, cia1),
+            (_, AddrMode::ZeroPageIndexedIndirect) => self.load_zp_indexed_indirect_byte(video, cia1),
+            (_, AddrMode::ZeroPageIndexedWithX) => self.load_zp_indexed_with_x_byte(video, cia1),
+            (_, AddrMode::ZeroPageIndexedWithY) => self.load_zp_indexed_with_y_byte(video, cia1),
+            (_, AddrMode::ZeroPageIndirect) => self.load_zp_indirect_byte(video, cia1),
             (_, AddrMode::ZeroPageIndirectIndexedWithY) => {
-                self.load_zp_indirect_indexed_with_y_byte()
+                self.load_zp_indirect_indexed_with_y_byte(video, cia1)
             }
-            (_, AddrMode::ZeroPageRelative) => self.load_zp_byte(),
+            (_, AddrMode::ZeroPageRelative) => self.load_zp_byte(video, cia1),
         }
         self.cpu.cycles += mode.get_cycles();
     }
-    pub fn run_instruction(&mut self, inst: Instruction) {
+    pub fn run_instruction(&mut self, inst: Instruction, video: &mut Video, cia1: &mut Cia1 ) {
         match inst {
             Instruction::ADC => {
                 // add the accumulator and the argument
@@ -167,13 +167,13 @@ impl <'a,'b> Execution<'a,'b> {
                 if self.cpu.is_set(StatusFlag::BRK) {
                     self.cpu.inc_pc(2);
                 } else {
-                    self.stack_push_pc(2);
-                    self.stack_push_flags();
+                    self.stack_push_pc(2, video, cia1);
+                    self.stack_push_flags(video, cia1);
                     self.cpu.change_flags(
                         &[StatusFlag::BRK, StatusFlag::IRQDisable],
                         &[StatusFlag::Decimal],
                     );
-                    self.cpu.pc = self.mem.read_word(0xfffe);
+                    self.cpu.pc = self.mem.read_word(video, cia1, 0xfffe);
                     self.cpu.cycles = 7;
                 }
             }
@@ -230,8 +230,8 @@ impl <'a,'b> Execution<'a,'b> {
                 self.cpu.set_pc();
             }
             Instruction::JSR => {
-                self.stack_push_pc(3);
-                self.load_addr_arg();
+                self.stack_push_pc(3, video, cia1);
+                self.load_addr_arg(video, cia1);
                 self.cpu.cycles = 6;
                 self.cpu.set_pc();
             }
@@ -258,41 +258,41 @@ impl <'a,'b> Execution<'a,'b> {
             }
             Instruction::PHA => {
                 self.cpu.tmp[0] = self.cpu.a;
-                self.stack_push_byte();
+                self.stack_push_byte(video, cia1);
             }
-            Instruction::PHP => self.stack_push_flags(),
+            Instruction::PHP => self.stack_push_flags(video, cia1),
             Instruction::PHX => {
                 self.cpu.tmp[0] = self.cpu.x;
-                self.stack_push_byte();
+                self.stack_push_byte(video, cia1);
             }
             Instruction::PHY => {
                 self.cpu.tmp[0] = self.cpu.y;
-                self.stack_push_byte();
+                self.stack_push_byte(video, cia1);
             }
             Instruction::PLA => {
-                self.stack_pull_byte();
+                self.stack_pull_byte(video, cia1);
                 self.cpu.a = self.cpu.tmp[0];
                 self.cpu.check_and_set_nz_flags(self.cpu.a);
             }
-            Instruction::PLP => self.stack_pull_flags(),
+            Instruction::PLP => self.stack_pull_flags(video, cia1),
             Instruction::PLX => {
-                self.stack_pull_byte();
+                self.stack_pull_byte(video, cia1);
                 self.cpu.x = self.cpu.tmp[0];
                 self.cpu.check_and_set_nz_flags(self.cpu.x);
             }
             Instruction::PLY => {
-                self.stack_pull_byte();
+                self.stack_pull_byte(video, cia1);
                 self.cpu.y = self.cpu.tmp[0];
                 self.cpu.check_and_set_nz_flags(self.cpu.y);
             }
-            Instruction::RMB0 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x01),
-            Instruction::RMB1 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x02),
-            Instruction::RMB2 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x04),
-            Instruction::RMB3 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x08),
-            Instruction::RMB4 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x10),
-            Instruction::RMB5 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x20),
-            Instruction::RMB6 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x40),
-            Instruction::RMB7 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x80),
+            Instruction::RMB0 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x01),
+            Instruction::RMB1 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x02),
+            Instruction::RMB2 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x04),
+            Instruction::RMB3 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x08),
+            Instruction::RMB4 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x10),
+            Instruction::RMB5 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x20),
+            Instruction::RMB6 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x40),
+            Instruction::RMB7 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x80),
             Instruction::ROL => {
                 let old_carry = self.cpu.is_set(StatusFlag::Carry);
                 self.cpu.check_and_set_or_clear_flag(StatusFlag::Carry, self.cpu.tmp[0] & 0x80);
@@ -310,12 +310,12 @@ impl <'a,'b> Execution<'a,'b> {
                 self.cpu.check_and_set_nz_flags(self.cpu.tmp[0]);
             }
             Instruction::RTI => {
-                self.stack_pull_flags();
-                self.stack_pull_addr();
+                self.stack_pull_flags(video, cia1);
+                self.stack_pull_addr(video, cia1);
                 self.cpu.set_pc();
             }
             Instruction::RTS => {
-                self.stack_pull_addr();
+                self.stack_pull_addr(video, cia1);
                 self.cpu.set_pc();
             }
             Instruction::SBC => {
@@ -343,19 +343,19 @@ impl <'a,'b> Execution<'a,'b> {
             Instruction::SEC => self.cpu.set_flag(StatusFlag::Carry),
             Instruction::SED => self.cpu.set_flag(StatusFlag::Decimal),
             Instruction::SEI => self.cpu.set_flag(StatusFlag::IRQDisable),
-            Instruction::SMB0 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x01),
-            Instruction::SMB1 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x02),
-            Instruction::SMB2 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x04),
-            Instruction::SMB3 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x08),
-            Instruction::SMB4 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x10),
-            Instruction::SMB5 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x20),
-            Instruction::SMB6 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x40),
-            Instruction::SMB7 => self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0] & !0x80),
-            Instruction::STA => self.mem.write(self.cpu.tmp_addr, self.cpu.a),
+            Instruction::SMB0 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x01),
+            Instruction::SMB1 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x02),
+            Instruction::SMB2 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x04),
+            Instruction::SMB3 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x08),
+            Instruction::SMB4 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x10),
+            Instruction::SMB5 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x20),
+            Instruction::SMB6 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x40),
+            Instruction::SMB7 => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x80),
+            Instruction::STA => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.a),
             Instruction::STP => {}
-            Instruction::STX => self.mem.write(self.cpu.tmp_addr, self.cpu.x),
-            Instruction::STY => self.mem.write(self.cpu.tmp_addr, self.cpu.y),
-            Instruction::STZ => self.mem.write(self.cpu.tmp_addr, 0),
+            Instruction::STX => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.x),
+            Instruction::STY => self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.y),
+            Instruction::STZ => self.mem.write(video, cia1, self.cpu.tmp_addr, 0),
             Instruction::TAX => {
                 self.cpu.x = self.cpu.a;
                 self.cpu.check_and_set_nz_flags(self.cpu.x);
@@ -366,11 +366,11 @@ impl <'a,'b> Execution<'a,'b> {
             }
             Instruction::TRB => {
                 self.cpu.check_and_set_z_flag(self.cpu.a & self.cpu.tmp[0]);
-                self.mem.write(self.cpu.tmp_addr, !self.cpu.a & self.cpu.tmp[0])
+                self.mem.write(video, cia1, self.cpu.tmp_addr, !self.cpu.a & self.cpu.tmp[0])
             }
             Instruction::TSB => {
                 self.cpu.check_and_set_z_flag(self.cpu.a & self.cpu.tmp[0]);
-                self.mem.write(self.cpu.tmp_addr, self.cpu.a | self.cpu.tmp[0]);
+                self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.a | self.cpu.tmp[0]);
             }
             Instruction::TSX => {
                 self.cpu.x = self.cpu.sp;
@@ -389,7 +389,7 @@ impl <'a,'b> Execution<'a,'b> {
             Instruction::ILL => {}
         }
     }
-    pub fn run_store(&mut self, inst: Instruction, mode: AddrMode) {
+    pub fn run_store(&mut self, inst: Instruction, mode: AddrMode, video: &mut Video, cia1: &mut Cia1) {
         match (inst, mode) {
             (
                 Instruction::ASL
@@ -400,7 +400,7 @@ impl <'a,'b> Execution<'a,'b> {
                 | Instruction::ROR,
                 AddrMode::Absolute | AddrMode::AbsoluteIndexedWithX,
             ) => {
-                self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0]);
+                self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0]);
                 self.cpu.cycles += 2;
                 self.cpu.inc_pc(3);
             }
@@ -413,7 +413,7 @@ impl <'a,'b> Execution<'a,'b> {
                 | Instruction::ROR,
                 AddrMode::ZeroPage | AddrMode::ZeroPageIndexedWithX,
             ) => {
-                self.mem.write(self.cpu.tmp_addr, self.cpu.tmp[0]);
+                self.mem.write(video, cia1, self.cpu.tmp_addr, self.cpu.tmp[0]);
                 self.cpu.cycles += 2;
                 self.cpu.inc_pc(2);
             }
@@ -448,7 +448,7 @@ impl <'a,'b> Execution<'a,'b> {
             (_, AddrMode::Implied) => self.cpu.inc_pc(1),
             (_, AddrMode::Relative) => {
                 let take_branch = self.cpu.tmp[0] != 0;
-                self.load_byte_arg();
+                self.load_byte_arg(video, cia1);
                 let old_pc = self.cpu.pc;
                 self.cpu.inc_pc(2);
                 if take_branch {
@@ -468,231 +468,231 @@ impl <'a,'b> Execution<'a,'b> {
             (_, AddrMode::ZeroPageRelative) => self.cpu.inc_pc(3),
         }
     }
-    pub fn stack_push_byte(&mut self) {
-        self._stack_push_byte(false);
+    pub fn stack_push_byte(&mut self, video: &mut Video, cia1: &mut Cia1) {
+        self._stack_push_byte(false, video, cia1);
     }
-    pub fn stack_pull_byte(&mut self) {
-        self._stack_pull_byte(false);
+    pub fn stack_pull_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self._stack_pull_byte(false, video, cia1);
     }
-    pub fn stack_pull_addr(&mut self) {
+    pub fn stack_pull_addr(&mut self, video: &Video, cia1: &Cia1) {
         self.cpu.sp = self.cpu.sp.wrapping_add(1);
         let stack_base: u16 = 0x100;
         let addr: u16 = self.cpu.sp.into();
         let addr = stack_base.wrapping_add(addr);
-        self.cpu.tmp_addr = self.mem.read_word(addr);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, addr);
         self.cpu.sp = self.cpu.sp.wrapping_add(1);
     }
-    pub fn stack_push_addr(&mut self) {
+    pub fn stack_push_addr(&mut self, video: &mut Video, cia1: &mut Cia1) {
         self.cpu.sp = self.cpu.sp.wrapping_sub(1);
         let stack_base: u16 = 0x100;
         let addr: u16 = self.cpu.sp.into();
         let addr = stack_base.wrapping_add(addr);
-        self.mem.write_word(addr, self.cpu.tmp_addr);
+        self.mem.write_word(video, cia1, addr, self.cpu.tmp_addr);
         self.cpu.sp = self.cpu.sp.wrapping_sub(1);
     }
-    fn _stack_push_byte(&mut self, hi: bool) {
+    fn _stack_push_byte(&mut self, hi: bool, video: &mut Video, cia1: &mut Cia1) {
         let byte = self.cpu.tmp[if hi { 1 } else { 0 }];
         let stack_base: u16 = 0x100;
         let addr: u16 = self.cpu.sp.into();
         let addr = stack_base.wrapping_add(addr);
-        self.mem.write(addr, byte);
+        self.mem.write(video, cia1, addr, byte);
         self.cpu.sp = self.cpu.sp.wrapping_sub(1)
     }
-    fn _stack_pull_byte(&mut self, hi: bool) {
+    fn _stack_pull_byte(&mut self, hi: bool, video: &Video, cia1: &Cia1) {
         self.cpu.sp = self.cpu.sp.wrapping_add(1);
         let stack_base: u16 = 0x100;
         let addr: u16 = self.cpu.sp.into();
         let addr = stack_base.wrapping_add(addr);
         if hi {
-            self.cpu.tmp[1] = self.mem.read(addr.wrapping_add(1));
+            self.cpu.tmp[1] = self.mem.read(video, cia1, addr.wrapping_add(1));
         } else {
-            self.cpu.tmp[0] = self.mem.read(addr);
+            self.cpu.tmp[0] = self.mem.read(video, cia1, addr);
         }
     }
-    pub fn stack_push_pc(&mut self, increment: u8) {
+    pub fn stack_push_pc(&mut self, increment: u8, video: &mut Video, cia1: &mut Cia1) {
         self.cpu.tmp_addr = self.cpu.pc.wrapping_add(increment.into());
-        self.stack_push_addr();
+        self.stack_push_addr(video, cia1);
     }
-    pub fn stack_push_flags(&mut self) {
+    pub fn stack_push_flags(&mut self, video: &mut Video, cia1: &mut Cia1) {
         self.cpu.tmp[0] = self.cpu.st.0;
-        self.stack_push_byte();
+        self.stack_push_byte(video, cia1);
     }
-    pub fn stack_pull_flags(&mut self) {
-        self.stack_pull_byte();
+    pub fn stack_pull_flags(&mut self, video: &Video, cia1: &Cia1) {
+        self.stack_pull_byte(video, cia1);
         self.cpu.st.0 = self.cpu.tmp[0];
     }
-    fn _load_byte_arg_lo(&mut self) {
+    fn _load_byte_arg_lo(&mut self, video: &Video, cia1: &Cia1) {
         let addr: u16 = self.cpu.pc.wrapping_add(1);
-        self.cpu.tmp[0] = self.mem.read(addr);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, addr);
     }
-    fn _load_byte_arg_hi(&mut self) {
+    fn _load_byte_arg_hi(&mut self, video: &Video, cia1: &Cia1) {
         let addr: u16 = self.cpu.pc.wrapping_add(2);
-        self.cpu.tmp[1] = self.mem.read(addr);
+        self.cpu.tmp[1] = self.mem.read(video, cia1, addr);
     }
     /**
      * Load the byte-sized argument into tmp[0]
      * tmp[1] is set to 0
      */
-    pub fn load_byte_arg(&mut self) {
+    pub fn load_byte_arg(&mut self, video: &Video, cia1: &Cia1) {
         self.cpu.tmp[1] = 0;
-        self._load_byte_arg_lo();
+        self._load_byte_arg_lo(video, cia1);
     }
     /**
      * Load the word-sized argument into tmp
      */
-    pub fn load_word_arg(&mut self) {
-        self._load_byte_arg_lo();
-        self._load_byte_arg_hi();
+    pub fn load_word_arg(&mut self, video: &Video, cia1: &Cia1) {
+        self._load_byte_arg_lo(video, cia1);
+        self._load_byte_arg_hi(video, cia1);
     }
     /**
      * Load the address argument into tmp_addr
      */
-    pub fn load_addr_arg(&mut self) {
-        self.load_word_arg();
+    pub fn load_addr_arg(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_word_arg(video, cia1);
         self.cpu.tmp_addr = u16::from_le_bytes(self.cpu.tmp);
     }
     /**
      * Load the zeropage address argument into tmp_addr
      */
-    pub fn load_zp_arg(&mut self) {
-        self.load_byte_arg();
+    pub fn load_zp_arg(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_byte_arg(video, cia1);
         self.cpu.tmp_addr = u16::from_le_bytes(self.cpu.tmp);
     }
-    fn _load_absolute_lo(&mut self) {
-        self.load_addr_arg();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    fn _load_absolute_lo(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
     // depends on _load_absolute_lo having been called before
-    fn _load_absolute_hi(&mut self) {
-        self.cpu.tmp[1] = self.mem.read(self.cpu.tmp_addr.wrapping_add(1));
+    fn _load_absolute_hi(&mut self, video: &Video, cia1: &Cia1) {
+        self.cpu.tmp[1] = self.mem.read(video, cia1, self.cpu.tmp_addr.wrapping_add(1));
     }
     /**
      * Loads a byte from the address pointed at by the address argument
      */
-    pub fn load_absolute_byte(&mut self) {
-        self._load_absolute_lo()
+    pub fn load_absolute_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self._load_absolute_lo(video, cia1)
     }
     /**
      * Loads an address from the address pointed at by the argument
      */
-    pub fn load_absolute_addr(&mut self) {
-        self.load_addr_arg();
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+    pub fn load_absolute_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
     }
     /**
      * Loads a byte from (abs)
      */
-    pub fn load_absolute_indirect_byte(&mut self) {
-        self.load_absolute_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_absolute_indirect_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_absolute_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_absolute_indexed_indirect_addr(&mut self) {
-        self.load_addr_arg();
+    pub fn load_absolute_indexed_indirect_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.x.into());
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
     }
     /**
      * Loads a byte from (abs,x)
      */
-    pub fn load_absolute_indexed_indirect_byte(&mut self) {
-        self.load_absolute_indexed_indirect_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_absolute_indexed_indirect_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_absolute_indexed_indirect_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_absolute_indexed_with_x_addr(&mut self) {
-        self.load_addr_arg();
+    pub fn load_absolute_indexed_with_x_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.x.into());
     }
     /**
      * Loads a byte from abs,x
      */
-    pub fn load_absolute_indexed_with_x_byte(&mut self) {
-        self.load_addr_arg();
+    pub fn load_absolute_indexed_with_x_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
         let old_addr = self.cpu.tmp_addr;
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.x.into());
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
-    pub fn load_absolute_indexed_with_y_addr(&mut self) {
-        self.load_addr_arg();
+    pub fn load_absolute_indexed_with_y_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.y.into());
     }
     /**
      * Loads a byte from a,y
      */
-    pub fn load_absolute_indexed_with_y_byte(&mut self) {
-        self.load_addr_arg();
+    pub fn load_absolute_indexed_with_y_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_addr_arg(video, cia1);
         let old_addr = self.cpu.tmp_addr;
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.y.into());
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
-    pub fn load_zp_indexed_indirect_addr(&mut self) {
-        self.load_zp_arg();
+    pub fn load_zp_indexed_indirect_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.x.into());
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
     }
     /**
      * Loads a byte from the (zp,x) address in the argument
      */
-    pub fn load_zp_indexed_indirect_byte(&mut self) {
-        self.load_zp_indexed_indirect_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_zp_indexed_indirect_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_indexed_indirect_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_zp_indirect_addr(&mut self) {
-        self.load_zp_arg();
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+    pub fn load_zp_indirect_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
     }
     /**
      * Load a byte from the (zp) address in the argument
      */
-    pub fn load_zp_indirect_byte(&mut self) {
-        self.load_zp_indirect_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_zp_indirect_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_indirect_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_zp_indirect_indexed_with_y_addr(&mut self) {
-        self.load_zp_arg();
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+    pub fn load_zp_indirect_indexed_with_y_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.y.into());
     }
     /**
      * Load a byte from the (zp),y address in the argument
      */
-    pub fn load_zp_indirect_indexed_with_y_byte(&mut self) {
-        self.load_zp_arg();
-        self.cpu.tmp_addr = self.mem.read_word(self.cpu.tmp_addr);
+    pub fn load_zp_indirect_indexed_with_y_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
+        self.cpu.tmp_addr = self.mem.read_word(video, cia1, self.cpu.tmp_addr);
         let old_addr = self.cpu.tmp_addr;
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.y.into());
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
         self.inc_cycles_if_page_boundary_crossed(old_addr);
     }
     /**
      * Load a byte from the zp address in the argument
      */
-    pub fn load_zp_byte(&mut self) {
-        self.load_zp_arg();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_zp_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_zp_indexed_with_x_addr(&mut self) {
-        self.load_zp_arg();
+    pub fn load_zp_indexed_with_x_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.x.into());
     }
     /**
      * Load a byte from the zp,x address in the argument
      */
-    pub fn load_zp_indexed_with_x_byte(&mut self) {
-        self.load_zp_indexed_with_x_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_zp_indexed_with_x_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_indexed_with_x_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
-    pub fn load_zp_indexed_with_y_addr(&mut self) {
-        self.load_zp_arg();
+    pub fn load_zp_indexed_with_y_addr(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_arg(video, cia1);
         self.cpu.tmp_addr = self.cpu.tmp_addr.wrapping_add(self.cpu.y.into());
     }
     /**
      * Load a byte from the zp,y address in the argument
      */
-    pub fn load_zp_indexed_with_y_byte(&mut self) {
-        self.load_zp_indexed_with_y_addr();
-        self.cpu.tmp[0] = self.mem.read(self.cpu.tmp_addr);
+    pub fn load_zp_indexed_with_y_byte(&mut self, video: &Video, cia1: &Cia1) {
+        self.load_zp_indexed_with_y_addr(video, cia1);
+        self.cpu.tmp[0] = self.mem.read(video, cia1, self.cpu.tmp_addr);
     }
     fn inc_cycles_if_page_boundary_crossed(&mut self, old_addr: u16) {
         if self.cpu.tmp_addr & 0xff00 != old_addr & 0xff00 {

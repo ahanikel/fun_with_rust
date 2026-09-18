@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::cpu6502::model::addr_mode::AddrMode;
-use crate::cpu6502::model::{asm, asm_into, opcode_from_instruction_and_mode};
+use crate::cpu6502::model::{asm_into, opcode_from_instruction_and_mode};
 use crate::cpu6502::model::instruction::Instruction;
 use crate::cpu6502::*;
 
@@ -670,6 +670,11 @@ fn test_inc_zp_sta_ind_y() {
     assert_eq!(0x04, mem.load_memory_byte(0xc2));
     assert_eq!(0x0403, mem.load_memory_word(0xc1));
     assert_eq!(0xee, cpu.a);
+}
+
+#[test]
+fn test_timer_interrupt() {
+    todo!()
 }
 
 mod it;

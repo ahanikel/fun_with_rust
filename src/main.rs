@@ -14,13 +14,13 @@ use crate::{
         cpu::CPU,
         memory::{Memory, MemoryDevice, MemoryFromFile},
         model,
+        video,
     },
     video::{AppHandler, Video, cia1::Cia1, control::Control},
 };
 
 mod cpu6502;
 mod heap;
-mod video;
 mod new_c64;
 
 #[derive(Parser)]

@@ -6,7 +6,7 @@ use std::str::FromStr;
 use addr_mode::AddrMode;
 use instruction::Instruction;
 
-use crate::new_c64::{cpu::model::addr_mode::AddrModeWithAddr, memory::Memory};
+use crate::new_c64::{cia1::Cia1, cpu::model::addr_mode::AddrModeWithAddr, memory::Memory, video::Video};
 
 pub trait IsOriginal {
     fn is_original(&self) -> bool;
@@ -274,43 +274,43 @@ pub fn instruction_and_mode(opcode: u8) -> (Instruction, AddrMode) {
     ][opcode]
 }
 
-pub fn disasm(pc: u16, mem: &mut Memory) -> String {
-    disasm_and_len(pc, mem).0
+pub fn disasm(pc: u16, mem: &mut Memory, video: &Video, cia1: &Cia1) -> String {
+    disasm_and_len(pc, mem, video, cia1).0
 }
 
-pub fn disasm_and_len(pc: u16, mem: &mut Memory) -> (String, u8) {
-    match instruction_and_mode(mem.read(pc)) {
+pub fn disasm_and_len(pc: u16, mem: &mut Memory, video: &Video, cia1: &Cia1) -> (String, u8) {
+    match instruction_and_mode(mem.read(video, cia1, pc)) {
         (inst, AddrMode::Absolute) => {
-            (format!("{} ${:04X}", inst, mem.read_word(pc.wrapping_add(1))), 3)
+            (format!("{} ${:04X}", inst, mem.read_word(video, cia1, pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedIndirect) => {
-            (format!("{} (${:04X},X)", inst, mem.read_word(pc.wrapping_add(1))), 3)
+            (format!("{} (${:04X},X)", inst, mem.read_word(video, cia1, pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedWithX) => {
-            (format!("{} ${:04X},X", inst, mem.read_word(pc.wrapping_add(1))), 3)
+            (format!("{} ${:04X},X", inst, mem.read_word(video, cia1, pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndexedWithY) => {
-            (format!("{} ${:04X},Y", inst, mem.read_word(pc.wrapping_add(1))), 3)
+            (format!("{} ${:04X},Y", inst, mem.read_word(video, cia1, pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::AbsoluteIndirect) => {
-            (format!("{} (${:04X})", inst, mem.read_word(pc.wrapping_add(1))), 3)
+            (format!("{} (${:04X})", inst, mem.read_word(video, cia1, pc.wrapping_add(1))), 3)
         }
         (inst, AddrMode::Accumulator) => (format!("{}", inst), 1),
-        (inst, AddrMode::Immediate) => (format!("{} #${:02X}", inst, mem.read(pc.wrapping_add(1))), 2),
+        (inst, AddrMode::Immediate) => (format!("{} #${:02X}", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
         (inst, AddrMode::Implied) => (format!("{}", inst), 1),
         (inst, AddrMode::Relative) => (format!(
             "{} ${:04X}",
             inst,
             pc.wrapping_add(2)
-                .wrapping_add_signed(mem.read(pc.wrapping_add(1)).cast_signed().into())
+                .wrapping_add_signed(mem.read(video, cia1, pc.wrapping_add(1)).cast_signed().into())
         ), 2),
-        (inst, AddrMode::ZeroPage) => (format!("{} ${:02X}", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageIndexedIndirect) => (format!("{} (${:02X},X)", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageIndexedWithX) => (format!("{} ${:02X},X", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageIndexedWithY) => (format!("{} ${:02X},Y", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageIndirect) => (format!("{} (${:02X})", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => (format!("{} (${:02X}),Y", inst, mem.read(pc.wrapping_add(1))), 2),
-        (inst, AddrMode::ZeroPageRelative) => (format!("{} #${:02X} ${:02X}", inst, mem.read(pc.wrapping_add(1)), mem.read(pc.wrapping_add(2))), 3),
+        (inst, AddrMode::ZeroPage) => (format!("{} ${:02X}", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedIndirect) => (format!("{} (${:02X},X)", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedWithX) => (format!("{} ${:02X},X", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndexedWithY) => (format!("{} ${:02X},Y", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndirect) => (format!("{} (${:02X})", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageIndirectIndexedWithY) => (format!("{} (${:02X}),Y", inst, mem.read(video, cia1, pc.wrapping_add(1))), 2),
+        (inst, AddrMode::ZeroPageRelative) => (format!("{} #${:02X} ${:02X}", inst, mem.read(video, cia1, pc.wrapping_add(1)), mem.read(video, cia1, pc.wrapping_add(2))), 3),
     }
 }
 
