@@ -69,9 +69,7 @@ fn main() {
     match cmd_args.subcommands {
         Subcommands::Wozmon => wozmon(),
         Subcommands::C64 { kernal, basic, verbose } => {
-            dbg!(kernal);
-            dbg!(basic);
-            dbg!(verbose);
+            new_c64::c64(&kernal, &basic, verbose);
         }
         Subcommands::C64Old { kernal, basic, verbose } => {
             c64(kernal.to_str().unwrap(), basic.to_str().unwrap(), verbose)

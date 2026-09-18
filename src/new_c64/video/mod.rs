@@ -1,19 +1,11 @@
 pub mod control;
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
-use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::Pixels ;
 use tracing::warn;
-use winit::{
-    application::ApplicationHandler,
-    dpi::LogicalSize,
-    event::{ElementState, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop},
-    keyboard::{KeyCode, NativeKeyCode},
-    window::{WindowAttributes, WindowId},
-};
 
-use crate::new_c64::{cia1::{self, Cia1}, cpu::Cpu, memory::Memory, video::control::{Control, ScreenMode, ScreenState}};
+use crate::new_c64::{cia1::Cia1, memory::Memory, video::control::{Control, ScreenMode, ScreenState}};
 
 /**
  *  0400-07E7 Default screen memory

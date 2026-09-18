@@ -4,7 +4,7 @@ mod execute;
 
 use tracing::info;
 
-use crate::new_c64::{cia1::{self, Cia1}, cpu::{execute::Execution, model::instruction_and_mode}, video::Video};
+use crate::new_c64::{cia1::Cia1, cpu::{execute::Execution, model::instruction_and_mode}, video::Video};
 
 use super::memory::Memory;
 
@@ -73,9 +73,6 @@ impl Cpu {
             log_instructions,
         }
     }
-    fn trigger() {}
-    fn interrupt() {}
-    fn nmi() {}
     pub fn reset(&mut self, mem: &Memory, video: &Video, cia1: &Cia1) {
         self.pc = mem.read_word(video, cia1, 0xfffc);
         self.st = StatusFlags(32);

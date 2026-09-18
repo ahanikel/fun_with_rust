@@ -1,4 +1,4 @@
-use std::{io::Read, path::{Path, PathBuf}};
+use std::{io::Read, path::Path};
 
 use crate::new_c64::{cia1::Cia1, video::Video};
 
@@ -29,7 +29,6 @@ impl Memory {
             f.read_exact(&mut basic).expect("Unable to read 8192 bytes from basic file");
             basic
         };
-        let io = [0; 4096];
         Self { mem, kernal, basic, char_rom: super::char_rom::CHARS }
     }
     /**

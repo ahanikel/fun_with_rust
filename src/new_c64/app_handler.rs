@@ -3,7 +3,7 @@ use std::sync::Arc;
 use pixels::{PixelsBuilder, SurfaceTexture};
 use winit::{application::ApplicationHandler, dpi::LogicalSize, event::{ElementState, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop}, keyboard::{KeyCode, NativeKeyCode}, window::{WindowAttributes, WindowId}};
 
-use crate::new_c64::{cia1::Cia1, cpu::Cpu, memory::Memory, video::{Video, control::{ScreenMode, ScreenState}}};
+use crate::new_c64::{cia1::Cia1, cpu::Cpu, memory::Memory, video::Video};
 
 pub struct AppHandler<'v> {
     cpu: Cpu,

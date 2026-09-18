@@ -1,4 +1,4 @@
-use crate::{cpu6502::video, new_c64::{cia1::Cia1, cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, instruction::Instruction}}, memory::Memory, video::Video}};
+use crate::{new_c64::{cia1::Cia1, cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, instruction::Instruction}}, memory::Memory, video::Video}};
 
 pub struct Execution<'a,'b> {
     cpu: &'a mut Cpu,

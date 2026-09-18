@@ -1,4 +1,5 @@
 
+#![allow(unused)]
 use chrono::Timelike;
 
 mod test;
@@ -94,7 +95,7 @@ impl Cia1 {
                 self.timer_b_value -= 1;
             }
         }
-        let now = [self.read(0x8),
+        self.current_time = [self.read(0x8),
         self.read(0x9),
         self.read(0xa),
         self.read(0xb)];
