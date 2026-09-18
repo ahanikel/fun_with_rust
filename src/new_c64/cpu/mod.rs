@@ -168,7 +168,7 @@ impl Cpu {
         self.set_or_clear_flag(flag, val != 0);
     }
 
-    pub fn step(&mut self, mem: &mut Memory, video: &mut Video, cia1: &mut Cia1) {
+    pub fn step(&mut self, mem: &mut Memory, video: &mut Video<'_>, cia1: &mut Cia1) {
         if self.reset {
             match self.cycle {
                 7 => {
@@ -183,9 +183,9 @@ impl Cpu {
         }
         if self.cycle == 0 && self.irq {
             if self.is_clear(StatusFlag::IRQDisable) {
-                let mut execution = Execution::new(self, mem);
-                execution.stack_push_pc(2, video, cia1);
-                execution.stack_push_flags(video, cia1);
+                let mut execution = Execution::new(self, mem, video, cia1);
+                execution.stack_push_pc(2);
+                execution.stack_push_flags();
                 self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
                 self.pc = mem.read_word(video, cia1, 0xfffe);
                 self.cycles = 7;
@@ -210,10 +210,10 @@ impl Cpu {
             }
             let (inst, mode) = instruction_and_mode(opcode);
             self.cycles = 0;
-            let mut execution = Execution::new(self, mem);
-            execution.run_load(inst, mode, video, cia1);
-            execution.run_instruction(inst, video, cia1);
-            execution.run_store(inst, mode, video, cia1);
+            let mut execution = Execution::new(self, mem, video, cia1);
+            execution.run_load(inst, mode);
+            execution.run_instruction(inst);
+            execution.run_store(inst, mode);
             self.cycle += 1;
         } else if self.cycle == self.cycles - 1 {
             self.cycle = 0;
