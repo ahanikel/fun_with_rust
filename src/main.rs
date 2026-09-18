@@ -21,6 +21,7 @@ use crate::{
 mod cpu6502;
 mod heap;
 mod video;
+mod new_c64;
 
 #[derive(Parser)]
 #[command(name = "emulator", about = "An emulator for the 6502 and the c64")]
@@ -33,6 +34,14 @@ struct CmdArgs {
 enum Subcommands {
     Wozmon,
     C64 {
+        #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
+        kernal: PathBuf,
+        #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
+        basic: PathBuf,
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    C64Old {
         #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
         kernal: PathBuf,
         #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
@@ -60,6 +69,11 @@ fn main() {
     match cmd_args.subcommands {
         Subcommands::Wozmon => wozmon(),
         Subcommands::C64 { kernal, basic, verbose } => {
+            dbg!(kernal);
+            dbg!(basic);
+            dbg!(verbose);
+        }
+        Subcommands::C64Old { kernal, basic, verbose } => {
             c64(kernal.to_str().unwrap(), basic.to_str().unwrap(), verbose)
         }
         Subcommands::Asm { file, origin } => {
