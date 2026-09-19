@@ -67,16 +67,14 @@
 use std::{cell::RefCell, rc::Rc};
 use tracing::info;
 
-use crate::{cpu6502::{cpu::CPU, memory::Memory, model::asm}, video::cia1::Cia1};
+use crate::{new_c64::{cia1::Cia1, cpu::{Cpu, model::asm}, memory::Memory, video::Video}};
 
 #[test]
 fn test_1() {
-    let mut cpu = CPU::new();
-    let mut log_fn = |s: &str| { info!(s) };
-    cpu.log_instructions = Some(&mut log_fn);
-    let mut mem = Memory::new();
-    let cia1 = Rc::new(RefCell::new(Cia1::new()));
-    mem.register_device(cia1.clone(), 0xdc00, 0xdcff);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let code = [
                 "LDA #$7F",
                 "STA $DC0D",
@@ -99,63 +97,64 @@ fn test_1() {
                 "ORA #$11",
                 "STA $DC0E",
     ];
+    mem.write(&mut video, &mut cia1, 1, 0b1000_0000); // all RAM except I/O
     let mut origin = 0xa000;
     for line in code {
         let bytes = asm(line, origin).unwrap();
         for byte in bytes {
-            mem.store_memory_byte(origin, byte);
+            mem.write(&mut video, &mut cia1, origin, byte);
             origin += 1;
         }
     }
-    mem.store_memory_byte(0xfffc, 0x00);
-    mem.store_memory_byte(0xfffd, 0xa0);
-    cpu.reset(&mut mem);
+    mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0xa0);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     for _ in 0..13 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert_eq!(0, cia1.borrow().interrupt_ctrl);
+    assert_eq!(0, cia1.interrupt_ctrl);
     for _ in 0..4 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
     // active low, all ones = no key pressed
-    assert_eq!(0x7f, cia1.borrow().port_a);
+    assert_eq!(0x7f, cia1.port_a);
     for _ in 0..0xc {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert_eq!(0x08, cia1.borrow().timer_a_ctrl);
-    assert_eq!(0x08, cia1.borrow().timer_b_ctrl);
+    assert_eq!(0x08, cia1.timer_a_ctrl);
+    assert_eq!(0x08, cia1.timer_b_ctrl);
     for _ in 0..6 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert_eq!(0x0, cia1.borrow().ddr_b);
+    assert_eq!(0x0, cia1.ddr_b);
     for _ in 0..6 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert_eq!(0xff, cia1.borrow().ddr_a);
+    assert_eq!(0xff, cia1.ddr_a);
     for _ in 0..12 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert_eq!(0x4295, cia1.borrow().timer_a_latch);
-    assert_eq!(0x4295, cia1.borrow().timer_a_value);
-    assert!(!cia1.borrow().is_timer_a_int_enabled());
+    assert_eq!(0x4295, cia1.timer_a_latch);
+    assert_eq!(0x4295, cia1.timer_a_value);
+    assert!(!cia1.is_timer_a_int_enabled());
     for _ in 0..6 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert!(cia1.borrow().is_timer_a_int_enabled());
+    assert!(cia1.is_timer_a_int_enabled());
     for _ in 0..10 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem, &mut video, &mut cia1);
     }
-    assert!(cia1.borrow().is_timer_a_started());
-    assert!(cia1.borrow().is_timer_a_load_once());
-    cia1.borrow_mut().step();
-    assert!(cia1.borrow().is_timer_a_started());
-    assert!(!cia1.borrow().is_timer_a_load_once());
-    assert_eq!(0x4294, cia1.borrow().timer_a_value);
+    assert!(cia1.is_timer_a_started());
+    assert!(cia1.is_timer_a_load_once());
+    cia1.step();
+    assert!(cia1.is_timer_a_started());
+    assert!(!cia1.is_timer_a_load_once());
+    assert_eq!(0x4294, cia1.timer_a_value);
     for _ in 0..0x4293 {
-        cia1.borrow_mut().step();
+        cia1.step();
     }
-    assert_eq!(0x1, cia1.borrow().timer_a_value);
-    assert!(!cia1.borrow_mut().step());
-    assert_eq!(0x0, cia1.borrow().timer_a_value);
-    assert!(cia1.borrow_mut().step());
+    assert_eq!(0x1, cia1.timer_a_value);
+    assert!(!cia1.step());
+    assert_eq!(0x0, cia1.timer_a_value);
+    assert!(cia1.step());
 }

@@ -1,5 +1,5 @@
 
-mod model;
+pub mod model;
 mod execute;
 
 use tracing::info;
@@ -73,7 +73,7 @@ impl Cpu {
             log_instructions,
         }
     }
-    pub fn reset(&mut self, mem: &Memory, video: &Video, cia1: &Cia1) {
+    pub fn reset(&mut self, mem: &mut Memory, video: &mut Video, cia1: &mut Cia1) {
         self.pc = mem.read_word(video, cia1, 0xfffc);
         self.st = StatusFlags(32);
         self.irq = false;
@@ -218,8 +218,8 @@ impl Cpu {
         } else if self.cycle == self.cycles - 1 {
             self.cycle = 0;
         } else {
-            //self.cycle += 1;
-            self.cycle = 0;
+            self.cycle += 1;
+            //self.cycle = 0;
         }
     }
 }

@@ -31,6 +31,13 @@ impl Memory {
         };
         Self { mem, kernal, basic, char_rom: super::char_rom::CHARS }
     }
+    #[cfg(test)]
+    pub fn new_for_testing() -> Self {
+        let mem = [0; 65536];
+        let kernal = [0; 8192];
+        let basic = [0; 8192];
+        Self { mem, kernal, basic, char_rom: super::char_rom::CHARS }
+    }
     /**
      * Read a byte from memory at addr.
      * Address 0x0001 determines if we're reading from RAM or one of the ROMs.
@@ -45,7 +52,10 @@ impl Memory {
                 self.mem[addr as usize]
             }
         } else if addr < 0xe000 {
-            if self.mem[1] & 0b0110_0000 == 0 {
+            // It looks like in the C64 we cannot have the I/O chips enabled without
+            // either basic rom or kernal rom enabled, too.
+            // We're doing it differently here
+            if self.mem[1] & 0b1110_0000 == 0 {
                 self.mem[addr as usize]
             } else if self.mem[1] & 0b1000_0000 == 0 {
                 self.char_rom[(addr - 0xd000) as usize]
@@ -93,7 +103,10 @@ impl Memory {
         } else if addr < 0xd000 {
             self.mem[addr as usize] = byte;
         } else if addr < 0xe000 {
-            if self.mem[1] & 0b0110_0000 == 0 {
+            // It looks like in the C64 we cannot have the I/O chips enabled without
+            // either basic rom or kernal rom enabled, too.
+            // We're doing it differently here
+            if self.mem[1] & 0b1110_0000 == 0 {
                 // RAM
                 self.mem[addr as usize] = byte;
             } else if self.mem[1] & 0b1000_0000 != 0 {

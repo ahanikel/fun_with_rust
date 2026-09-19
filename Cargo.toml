@@ -4,8 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [profile.dev]
-debug = true
-opt-level = 0
+opt-level = 0           # No optimizations for faster compilation
+debug = true            # Include debug symbols
+debug-assertions = true # Enable runtime checks
+
+[profile.release]
+opt-level = 3          # Maximum optimizations
+debug = false          # No debug symbols by default
+lto = true             # Link-time optimization
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true           # Include symbols while keeping optimizations
 
 [dependencies]
 anyhow = "1.0.104"
