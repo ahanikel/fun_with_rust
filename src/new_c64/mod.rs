@@ -22,3 +22,5 @@ pub fn c64(kernal: &Path, basic: &Path, verbose: bool) {
     let mut app = AppHandler::new(cpu, video, mem, cia1);
     app.run();
 }
+
+mod test;

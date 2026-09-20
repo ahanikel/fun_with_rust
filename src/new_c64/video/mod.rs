@@ -139,8 +139,8 @@ impl<'a> Video<'a> {
         }
     }
 
-    pub fn render_pixels(&self) {
-        if let Some(p) = &self.pixels {
+    pub fn render_pixels(&mut self) {
+        if let Some(p) = self.pixels.as_mut() {
             p.render().unwrap_or(warn!("Failed to render pixels"))
         }
     }

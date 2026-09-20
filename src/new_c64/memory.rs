@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::ops::Range;
 use std::{io::Read, path::Path};
 
 use crate::new_c64::{cia1::Cia1, video::Video};
@@ -140,6 +142,18 @@ impl Memory {
         let bytes = word.to_le_bytes();
         self.write(video, cia1, addr, bytes[0]);
         self.write(video, cia1, addr.wrapping_add(1), bytes[1]);
+    }
+    #[cfg(test)]
+    // Note: this does not work for devices
+    pub fn get_range(&self, range: Range<usize>) -> &[u8] {
+        &self.mem[range]
+    }
+    #[cfg(test)]
+    // Note: this does not work for devices
+    pub fn set_range(&mut self, range: Range<usize>, src: Vec<u8>) {
+        let mem = &mut self.mem[range.clone()];
+        let src = &src[..range.end - range.start];
+        mem.copy_from_slice(src);
     }
 }
 
