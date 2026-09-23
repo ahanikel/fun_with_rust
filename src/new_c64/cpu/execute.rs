@@ -167,9 +167,9 @@ impl <'a,'b,'c,'d,'v> Execution<'a,'b,'c,'d,'v> {
             Instruction::BRA => self.cpu.tmp[0] = 1,
             Instruction::BRK => {
                 if self.cpu.is_set(StatusFlag::BRK) {
-                    self.cpu.inc_pc(2);
+                    self.cpu.inc_pc(1);
                 } else {
-                    self.stack_push_pc(2);
+                    self.stack_push_pc(1);
                     self.stack_push_flags();
                     self.cpu.change_flags(
                         &[StatusFlag::BRK, StatusFlag::IRQDisable],

@@ -184,7 +184,7 @@ impl Cpu {
         if self.cycle == 0 && self.irq {
             if self.is_clear(StatusFlag::IRQDisable) {
                 let mut execution = Execution::new(self, mem, video, cia1);
-                execution.stack_push_pc(2);
+                execution.stack_push_pc(0);
                 execution.stack_push_flags();
                 self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
                 self.pc = mem.read_word(video, cia1, 0xfffe);
