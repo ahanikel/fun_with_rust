@@ -5,7 +5,7 @@ use std::sync::Arc;
 use pixels::Pixels ;
 use tracing::warn;
 
-use crate::new_c64::{cia1::Cia1, memory::Memory, video::control::{Control, ScreenMode, ScreenState}};
+use crate::new_c64::{char_rom::CHARS, cia1::Cia1, memory::Memory, video::control::{Control, ScreenMode, ScreenState}};
 
 /**
  *  0400-07E7 Default screen memory
@@ -86,13 +86,13 @@ impl<'a> Video<'a> {
             }
         }
     }
-    pub fn do_char_at(&mut self, mem: &Memory, cia1: &Cia1, ch: u8, x: u8, y: u8, fg_col: u8, bg_col: u8) {
+    pub fn do_char_at(&mut self, ch: u8, x: u8, y: u8, fg_col: u8, bg_col: u8) {
         if self.pixels.is_some() {
             let frame_line_width = self.system.width * Self::BYTES_PER_PIXEL;
             let scan_y = self.system.y_min * frame_line_width;
             for char_line in 0..8 {
                 let scan_y_offset = (y as usize * 8 + char_line) * frame_line_width;
-                let pixels = mem.read(self, cia1, 0xd000 + (ch as u16 * 8 + char_line as u16));
+                let pixels = CHARS[ch as usize * 8 + char_line];
                 let scan_x_offset = (self.system.x_min + x as usize * 8) * Self::BYTES_PER_PIXEL;
                 let frame = self.pixels.as_mut().unwrap().frame_mut();
                 for bit in 0..8 {
@@ -130,7 +130,7 @@ impl<'a> Video<'a> {
                         let ch = mem.read(self, cia1, self.ram_base + offset);
                         let fg_col = mem.read(self, cia1, self.color_ram_base + offset);
                         let bg_col = self.regs.get_background_color();
-                        self.do_char_at(mem, cia1, ch, col, row, fg_col, bg_col as u8);
+                        self.do_char_at(ch, col, row, fg_col, bg_col as u8);
                     }
                 }
             }

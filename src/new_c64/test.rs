@@ -703,6 +703,7 @@ fn test_inc_zp_sta_ind_y() {
 }
 
 #[test]
+#[ignore = "just for debugging"]
 fn test_bank_switch() {
     let mut cpu = Cpu::new(true);
     let mut mem = Memory::new(Path::new("test-resources/kernal.901227-03.bin"), Path::new("test-resources/basic.901226-01.bin"));
@@ -710,17 +711,13 @@ fn test_bank_switch() {
     let mut cia1 = Cia1::new();
     mem.write(&mut video, &mut cia1, 1, 0b1110_0000); // enable ROMs
     cpu.reset(&mut mem, &mut video, &mut cia1);
-    #[allow(unused)]
-    let mut step: u64 = 0;
     loop {
         cpu.step(&mut mem,&mut video, &mut cia1);
-        step += 1;
         if cpu.pc == 0xea79 {
             break;
         }
     }
     loop {
         cpu.step(&mut mem,&mut video, &mut cia1);
-        step += 1;
     }
 }

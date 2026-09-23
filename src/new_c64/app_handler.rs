@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use pixels::{PixelsBuilder, SurfaceTexture};
 use tracing::info;
-use winit::{application::ApplicationHandler, dpi::LogicalSize, event::{ElementState, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop}, keyboard::{KeyCode, NativeKeyCode}, window::{Window, WindowAttributes, WindowId}};
+use winit::{application::ApplicationHandler, dpi::LogicalSize, event::{ElementState, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop}, keyboard::{KeyCode, NativeKeyCode}, window::{WindowAttributes, WindowId}};
 
 use crate::new_c64::{cia1::Cia1, cpu::Cpu, memory::Memory, video::Video};
 
@@ -158,7 +158,6 @@ impl ApplicationHandler for AppHandler<'_> {
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         if self.cia1.step() {
             if self.cia1.is_timer_a_underrun() {
-                info!("Timer A underrun");
                 self.video.redraw_screen(&mut self.mem, &mut self.cia1);
                 self.cpu.request_interrupt();
             }
