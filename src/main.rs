@@ -14,13 +14,14 @@ use crate::{
         cpu::CPU,
         memory::{Memory, MemoryDevice, MemoryFromFile},
         model,
+        video,
     },
     video::{AppHandler, Video, cia1::Cia1, control::Control},
 };
 
 mod cpu6502;
 mod heap;
-mod video;
+mod new_c64;
 
 #[derive(Parser)]
 #[command(name = "emulator", about = "An emulator for the 6502 and the c64")]
@@ -33,6 +34,14 @@ struct CmdArgs {
 enum Subcommands {
     Wozmon,
     C64 {
+        #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
+        kernal: PathBuf,
+        #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
+        basic: PathBuf,
+        #[arg(short, long)]
+        verbose: bool,
+    },
+    C64Old {
         #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
         kernal: PathBuf,
         #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
@@ -56,10 +65,14 @@ enum Subcommands {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     let cmd_args = CmdArgs::parse();
     match cmd_args.subcommands {
         Subcommands::Wozmon => wozmon(),
         Subcommands::C64 { kernal, basic, verbose } => {
+            new_c64::c64(&kernal, &basic, verbose);
+        }
+        Subcommands::C64Old { kernal, basic, verbose } => {
             c64(kernal.to_str().unwrap(), basic.to_str().unwrap(), verbose)
         }
         Subcommands::Asm { file, origin } => {
@@ -74,7 +87,6 @@ fn main() {
 }
 
 fn wozmon() {
-    tracing_subscriber::fmt::init();
     info!("Application starting");
     let out_fn = |b: u8| {
         if b == b'\r' {
@@ -107,7 +119,6 @@ fn wozmon() {
 }
 
 fn c64(kernal_file: &str, basic_file: &str, verbose: bool) {
-    tracing_subscriber::fmt::init();
     info!("Application starting");
     let mut log_fn = |s: &str| {
         info!(s);

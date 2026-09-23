@@ -1,34 +1,36 @@
 #![cfg(test)]
-use crate::cpu6502::model::addr_mode::AddrMode;
-use crate::cpu6502::model::{asm_into, opcode_from_instruction_and_mode};
-use crate::cpu6502::model::instruction::Instruction;
-use crate::cpu6502::*;
+
+use std::path::Path;
+
+use crate::new_c64::{cia1::Cia1, cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, asm_into, instruction::Instruction, opcode_from_instruction_and_mode}}, memory::Memory, video::Video};
 
 #[test]
 fn test_brk_rti() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    cpu.reset(&mut mem);
-    mem.store_memory_byte(0xfffe, 0xee);
-    mem.store_memory_byte(0xffff, 0xee);
-    mem.store_memory_byte(0xeef0, 0x40); // RTI
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    mem.write(&mut video, &mut cia1, 0xfffe, 0xee);
+    mem.write(&mut video, &mut cia1, 0xffff, 0xee);
+    mem.write(&mut video, &mut cia1, 0xeef0, 0x40); // RTI
     for step in 0..14 {
         print!("Step {step}: ");
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_set(StatusFlag::BRK));
     assert!(cpu.is_set(StatusFlag::IRQDisable));
     assert_eq!(0xeeee, cpu.pc);
     for step in 14..16 {
         print!("Step {step}: ");
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_set(StatusFlag::BRK));
     assert!(cpu.is_set(StatusFlag::IRQDisable));
     assert_eq!(0xeef0, cpu.pc);
     for step in 16..18 {
         print!("Step {step}: ");
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_clear(StatusFlag::BRK));
     assert!(cpu.is_clear(StatusFlag::IRQDisable));
@@ -37,39 +39,43 @@ fn test_brk_rti() {
 
 #[test]
 fn test_jsr_ret() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    mem.store_memory_byte(0xfffc, 0xcc);
-    mem.store_memory_byte(0xfffd, 0xcc);
-    mem.store_memory_byte(0xcccc, 0x20); // JSR
-    mem.store_memory_byte(0xcccd, 0xdd);
-    mem.store_memory_byte(0xccce, 0xdd);
-    mem.store_memory_byte(0xdddd, 0x60); // RTS
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    mem.write(&mut video, &mut cia1, 0xfffc, 0xcc);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0xcc);
+    mem.write(&mut video, &mut cia1, 0xcccc, 0x20); // JSR
+    mem.write(&mut video, &mut cia1, 0xcccd, 0xdd);
+    mem.write(&mut video, &mut cia1, 0xccce, 0xdd);
+    mem.write(&mut video, &mut cia1, 0xdddd, 0x60); // RTS
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     for step in 0..13 {
         print!("Step {step}: ");
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(0xdddd, cpu.pc);
     for step in 13..15 {
         print!("Step {step}: ");
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(0xcccf, cpu.pc);
 }
 
 #[test]
 fn test_beq_taken() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    mem.store_memory_byte(0xfffc, 0xaa);
-    mem.store_memory_byte(0xfffd, 0xaa);
-    mem.store_memory_byte(0xaaaa, 0xf0); // BEQ
-    mem.store_memory_byte(0xaaab, 0xc0);
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    mem.write(&mut video, &mut cia1, 0xfffc, 0xaa);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0xaa);
+    mem.write(&mut video, &mut cia1, 0xaaaa, 0xf0); // BEQ
+    mem.write(&mut video, &mut cia1, 0xaaab, 0xc0);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.set_flag(StatusFlag::Zero);
     for _step in 0..10 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(0, cpu.cycle);
     assert_eq!(0xaa6c, cpu.pc);
@@ -77,16 +83,18 @@ fn test_beq_taken() {
 
 #[test]
 fn test_beq_not_taken() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    mem.store_memory_byte(0xfffc, 0xaa);
-    mem.store_memory_byte(0xfffd, 0xaa);
-    mem.store_memory_byte(0xaaaa, 0xf0); // BEQ
-    mem.store_memory_byte(0xaaab, 0xc0);
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    mem.write(&mut video, &mut cia1, 0xfffc, 0xaa);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0xaa);
+    mem.write(&mut video, &mut cia1, 0xaaaa, 0xf0); // BEQ
+    mem.write(&mut video, &mut cia1, 0xaaab, 0xc0);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.clear_flag(StatusFlag::Zero);
     for _step in 0..9 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(0, cpu.cycle);
     assert_eq!(0xaaac, cpu.pc);
@@ -94,19 +102,21 @@ fn test_beq_not_taken() {
 
 #[test]
 fn test_cmp_zpx_ind_lt() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0x1000;
     cpu.a = 0x55;
     cpu.x = 1;
-    mem.store_memory_byte(0x50, 0x99);
-    mem.store_memory_byte(0x51, 0x99);
-    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
-    mem.store_memory_byte(0x1001, 0x4f);
-    mem.store_memory_byte(0x9999, 0xf0);
+    mem.write(&mut video, &mut cia1, 0x50, 0x99);
+    mem.write(&mut video, &mut cia1, 0x51, 0x99);
+    mem.write(&mut video, &mut cia1, 0x1000, 0xc1); // CMP (zp,x)
+    mem.write(&mut video, &mut cia1, 0x1001, 0x4f);
+    mem.write(&mut video, &mut cia1, 0x9999, 0xf0);
     for _step in 0..13 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_set(StatusFlag::Negative));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -115,19 +125,21 @@ fn test_cmp_zpx_ind_lt() {
 
 #[test]
 fn test_cmp_zpx_ind_eq() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0x1000;
     cpu.a = 0x55;
     cpu.x = 1;
-    mem.store_memory_byte(0x50, 0x99);
-    mem.store_memory_byte(0x51, 0x99);
-    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
-    mem.store_memory_byte(0x1001, 0x4f);
-    mem.store_memory_byte(0x9999, 0x55);
+    mem.write(&mut video, &mut cia1, 0x50, 0x99);
+    mem.write(&mut video, &mut cia1, 0x51, 0x99);
+    mem.write(&mut video, &mut cia1, 0x1000, 0xc1); // CMP (zp,x)
+    mem.write(&mut video, &mut cia1, 0x1001, 0x4f);
+    mem.write(&mut video, &mut cia1, 0x9999, 0x55);
     for _step in 0..13 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert!(cpu.is_set(StatusFlag::Zero));
@@ -136,19 +148,21 @@ fn test_cmp_zpx_ind_eq() {
 
 #[test]
 fn test_cmp_zpx_ind_gt() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    cpu.reset(&mut mem);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0x1000;
     cpu.a = 0xfe;
     cpu.x = 1;
-    mem.store_memory_byte(0x50, 0x99);
-    mem.store_memory_byte(0x51, 0x99);
-    mem.store_memory_byte(0x1000, 0xc1); // CMP (zp,x)
-    mem.store_memory_byte(0x1001, 0x4f);
-    mem.store_memory_byte(0x9999, 0x55);
+    mem.write(&mut video, &mut cia1, 0x50, 0x99);
+    mem.write(&mut video, &mut cia1, 0x51, 0x99);
+    mem.write(&mut video, &mut cia1, 0x1000, 0xc1); // CMP (zp,x)
+    mem.write(&mut video, &mut cia1, 0x1001, 0x4f);
+    mem.write(&mut video, &mut cia1, 0x9999, 0x55);
     for _step in 0..13 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -163,8 +177,10 @@ fn _test_sbc(
     expected_overflow: bool,
     expected_carry: bool,
 ) {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let carry_inst = if carry {
         Instruction::SEC
     } else {
@@ -177,13 +193,13 @@ fn _test_sbc(
         opcode_from_instruction_and_mode(Instruction::SBC, AddrMode::Immediate),
         b,
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0x1000;
     for (pos, b) in prog.iter().enumerate() {
-        mem.store_memory_byte(0x1000 + pos as u16, *b);
+        mem.write(&mut video, &mut cia1, 0x1000 + pos as u16, *b);
     }
     for _step in 0..14 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(
         expected_res, cpu.a,
@@ -326,8 +342,10 @@ fn test_sbc_8() {
 }
 
 fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_carry: bool) {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         a,
@@ -335,13 +353,13 @@ fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_c
         opcode_from_instruction_and_mode(Instruction::ADC, AddrMode::Immediate),
         b,
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0x1000;
     for (pos, b) in prog.iter().enumerate() {
-        mem.store_memory_byte(0x1000 + pos as u16, *b);
+        mem.write(&mut video, &mut cia1, 0x1000 + pos as u16, *b);
     }
     for _step in 0..14 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(
         expected_res, cpu.a,
@@ -480,8 +498,10 @@ FFC1 ...
  */
 fn test_cmp_sbc_1() {
     for mem_0x28 in [0, 2] {
-        let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+        let mut cpu = Cpu::new(true);
+        let mut mem = Memory::new_for_testing();
+        let mut video = Video::default();
+        let mut cia1 = Cia1::new();
         let prog = [
             opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
             0x24,
@@ -494,21 +514,21 @@ fn test_cmp_sbc_1() {
             opcode_from_instruction_and_mode(Instruction::BCS, AddrMode::Relative),
             0xc1,
         ];
-        cpu.reset(&mut mem);
+        cpu.reset(&mut mem, &mut video, &mut cia1);
         cpu.pc = 0xffb7;
         for (pos, b) in prog.iter().enumerate() {
-            mem.store_memory_byte(0xffb7 + pos as u16, *b);
+            mem.write(&mut video, &mut cia1, 0xffb7 + pos as u16, *b);
         }
-        mem.store_memory_byte(0x0024, 0);
-        mem.store_memory_byte(0x0025, 0);
-        mem.store_memory_byte(0x0028, mem_0x28);
-        mem.store_memory_byte(0x0029, 0);
+        mem.write(&mut video, &mut cia1, 0x0024, 0);
+        mem.write(&mut video, &mut cia1, 0x0025, 0);
+        mem.write(&mut video, &mut cia1, 0x0028, mem_0x28);
+        mem.write(&mut video, &mut cia1, 0x0029, 0);
         for _step in 0..21 {
-            cpu.step(&mut mem);
+            cpu.step(&mut mem,&mut video, &mut cia1);
         }
         match mem_0x28 {
             0 => {
-                cpu.step(&mut mem);
+                cpu.step(&mut mem,&mut video, &mut cia1);
                 assert!(cpu.is_set(StatusFlag::Carry));
                 assert!(cpu.is_set(StatusFlag::Zero));
                 assert!(cpu.is_clear(StatusFlag::Negative));
@@ -536,8 +556,10 @@ FFC1 ...
 
 */
 fn test_cmp_sbc_2() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::ZeroPage),
         0x24,
@@ -550,17 +572,17 @@ fn test_cmp_sbc_2() {
         opcode_from_instruction_and_mode(Instruction::BCS, AddrMode::Relative),
         0xc1,
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0xffb7;
     for (pos, b) in prog.iter().enumerate() {
-        mem.store_memory_byte(0xffb7 + pos as u16, *b);
+        mem.write(&mut video, &mut cia1, 0xffb7 + pos as u16, *b);
     }
-    mem.store_memory_byte(0x0024, 0x00);
-    mem.store_memory_byte(0x0025, 0xff);
-    mem.store_memory_byte(0x0028, 0x01);
-    mem.store_memory_byte(0x0029, 0xff);
+    mem.write(&mut video, &mut cia1, 0x0024, 0x00);
+    mem.write(&mut video, &mut cia1, 0x0025, 0xff);
+    mem.write(&mut video, &mut cia1, 0x0028, 0x01);
+    mem.write(&mut video, &mut cia1, 0x0029, 0xff);
     for _step in 0..21 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_clear(StatusFlag::Carry));
     assert!(cpu.is_clear(StatusFlag::Zero));
@@ -570,8 +592,10 @@ fn test_cmp_sbc_2() {
 
 #[test]
 fn test_bit() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         0x74,
@@ -582,13 +606,13 @@ fn test_bit() {
         opcode_from_instruction_and_mode(Instruction::BVC, AddrMode::Relative),
         0x10,
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0xff70;
     for (pos, b) in prog.iter().enumerate() {
-        mem.store_memory_byte(0xff70 + pos as u16, *b);
+        mem.write(&mut video, &mut cia1, 0xff70 + pos as u16, *b);
     }
     for _step in 0..17 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_set(StatusFlag::Overflow));
     assert_eq!(0xff78, cpu.pc);
@@ -596,35 +620,39 @@ fn test_bit() {
 
 #[test]
 fn test_jmp_ind() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
-    mem.store_memory_word(0xa000, 0xbbbb);
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    mem.write_word(&mut video, &mut cia1, 0xa000, 0xbbbb);
     let prog = [
         opcode_from_instruction_and_mode(Instruction::JMP, AddrMode::AbsoluteIndirect),
         0x00, 0xA0,
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0xff70;
     for (pos, b) in prog.iter().enumerate() {
-        mem.store_memory_byte(0xff70 + pos as u16, *b);
+        mem.write(&mut video, &mut cia1, 0xff70 + pos as u16, *b);
     }
     for _step in 0..12 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert_eq!(0xbbbb, cpu.pc);
 }
 
 #[test]
 fn test_sta_zp() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let prog = [
         "LDX #$3C",
         "LDY #$03",
         "STX $B2",
         "STY $B3",
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0xb000;
     let mut code = Vec::new();
     for line in prog {
@@ -634,17 +662,19 @@ fn test_sta_zp() {
     let to = from + code.len();
     mem.set_range(from..to, code);
     for _step in 0..17 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
-    assert_eq!(0x3c, mem.load_memory_byte(0xb2));
-    assert_eq!(0x03, mem.load_memory_byte(0xb3));
-    assert_eq!(0x033c, mem.load_memory_word(0xb2));
+    assert_eq!(0x3c, mem.read(&video, &cia1, 0xb2));
+    assert_eq!(0x03, mem.read(&video, &cia1, 0xb3));
+    assert_eq!(0x033c, mem.read_word(&video, &cia1, 0xb2));
 }
 
 #[test]
 fn test_inc_zp_sta_ind_y() {
-    let mut cpu = CPU::new();
-    let mut mem = Memory::new();
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
     let prog = [
         "LDA #$03",
         "TAY",
@@ -653,7 +683,7 @@ fn test_inc_zp_sta_ind_y() {
         "INC $C2",
         "LDA ($C1),Y",
     ];
-    cpu.reset(&mut mem);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
     cpu.pc = 0xb000;
     let mut code = Vec::new();
     for line in prog {
@@ -662,19 +692,32 @@ fn test_inc_zp_sta_ind_y() {
     let from = cpu.pc as usize;
     let to = from + code.len();
     mem.set_range(from..to, code);
-    mem.store_memory_byte(0x0406, 0xee);
+    mem.write(&mut video, &mut cia1, 0x0406, 0xee);
     for _step in 0..23 {
-        cpu.step(&mut mem);
+        cpu.step(&mut mem,&mut video, &mut cia1);
     }
-    assert_eq!(0x03, mem.load_memory_byte(0xc1));
-    assert_eq!(0x04, mem.load_memory_byte(0xc2));
-    assert_eq!(0x0403, mem.load_memory_word(0xc1));
+    assert_eq!(0x03, mem.read(&video, &cia1, 0xc1));
+    assert_eq!(0x04, mem.read(&video, &cia1, 0xc2));
+    assert_eq!(0x0403, mem.read_word(&video, &cia1, 0xc1));
     assert_eq!(0xee, cpu.a);
 }
 
 #[test]
-fn test_timer_interrupt() {
-    todo!()
+#[ignore = "just for debugging"]
+fn test_bank_switch() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new(Path::new("test-resources/kernal.901227-03.bin"), Path::new("test-resources/basic.901226-01.bin"));
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    mem.write(&mut video, &mut cia1, 1, 0b1110_0000); // enable ROMs
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    loop {
+        cpu.step(&mut mem,&mut video, &mut cia1);
+        if cpu.pc == 0xea79 {
+            break;
+        }
+    }
+    loop {
+        cpu.step(&mut mem,&mut video, &mut cia1);
+    }
 }
-
-mod it;

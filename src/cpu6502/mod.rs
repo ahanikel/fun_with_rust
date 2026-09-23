@@ -2,6 +2,7 @@ pub mod acia;
 pub mod cpu;
 pub mod memory;
 pub mod model;
+pub mod video;
 mod test;
 
 use cpu::{CPU, StatusFlag};
