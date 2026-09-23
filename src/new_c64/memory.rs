@@ -2,6 +2,8 @@
 use std::ops::Range;
 use std::{io::Read, path::Path};
 
+use tracing::info;
+
 use crate::new_c64::{cia1::Cia1, video::Video};
 
 /**
@@ -18,7 +20,8 @@ pub struct Memory {
 impl Memory {
     pub fn new(kernal_file: &Path, basic_file: &Path) -> Self {
         let mut mem = [0; 65536];
-        mem[1] = 0b1110_0000;
+        mem[0] = 0x2f;
+        mem[1] = 0x37;
         let kernal = {
             let mut f = std::fs::File::open(kernal_file).expect("Unable to open kernal file");
             let mut kernal = [0; 8192];
@@ -48,18 +51,17 @@ impl Memory {
         if addr < 0xa000 {
             self.mem[addr as usize]
         } else if addr < 0xc000 {
-            if self.mem[1] & 0b0110_0000 == 0b0110_0000 {
+            if self.mem[1] & 0b011 == 0b011 {
                 self.basic[(addr - 0xa000) as usize]
             } else {
                 self.mem[addr as usize]
             }
         } else if addr < 0xe000 {
-            // It looks like in the C64 we cannot have the I/O chips enabled without
-            // either basic rom or kernal rom enabled, too.
-            // We're doing it differently here
-            if self.mem[1] & 0b1110_0000 == 0 {
+            if self.mem[1] & 0b011 == 0 {
+                // RAM
                 self.mem[addr as usize]
-            } else if self.mem[1] & 0b1000_0000 == 0 {
+            } else if self.mem[1] & 0b100 == 0 {
+                // Character ROM
                 self.char_rom[(addr - 0xd000) as usize]
             } else {
                 // IO (Video, SID, CIA1, CIA2)
@@ -81,10 +83,8 @@ impl Memory {
                     self.mem[addr as usize]
                 }
             }
-        } else if addr < 0xe000 {
-            self.mem[addr as usize]
         } else {
-            if self.mem[1] & 0b0100_0000 == 0b0100_0000 {
+            if self.mem[1] & 0b010 == 0b010 {
                 self.kernal[(addr - 0xe000) as usize]
             } else {
                 self.mem[addr as usize]
@@ -96,22 +96,23 @@ impl Memory {
      * If addr is in ROM, ignore.
      */
     pub fn write(&mut self, video: &mut Video, cia1: &mut Cia1, addr: u16, byte: u8) {
-        if addr < 0xa000 {
+        if addr == 0x1 {
+            info!("Modifying 0x1: {:08b}", byte);
+            self.mem[addr as usize] = byte;
+        } else if addr < 0xa000 {
             self.mem[addr as usize] = byte;
         } else if addr < 0xc000 {
-            if self.mem[1] & 0b0110_0000 != 0b0110_0000 {
-                self.mem[addr as usize] = byte;
-            }
+            // Writes always go to RAM, regardless of bank setting
+            //if self.mem[1] & 0b0110_0000 != 0b0110_0000 {
+            self.mem[addr as usize] = byte;
+            //}
         } else if addr < 0xd000 {
             self.mem[addr as usize] = byte;
         } else if addr < 0xe000 {
-            // It looks like in the C64 we cannot have the I/O chips enabled without
-            // either basic rom or kernal rom enabled, too.
-            // We're doing it differently here
-            if self.mem[1] & 0b1110_0000 == 0 {
+            if self.mem[1] & 0b011 == 0 {
                 // RAM
                 self.mem[addr as usize] = byte;
-            } else if self.mem[1] & 0b1000_0000 != 0 {
+            } else if self.mem[1] & 0b100 != 0 {
                 // IO (Video, SID, CIA1, CIA2)
                 if addr < 0xd400 {
                     video.write((addr - 0xd000) % 0x40, byte);
@@ -125,14 +126,18 @@ impl Memory {
                     cia1.write((addr - 0xdc00) % 0x10, byte);
                 } else if addr < 0xde00 {
                     //self.cia2.write((addr - 0xdc00) % 0x10, byte);
+                } else if addr < 0xe000 {
+                    // IO Area #1 and #2: we treat this as normal RAM for now
+                    self.mem[addr as usize] = byte;
                 }
-                // IO Area #1 and #2: ignore
-            }
-            // Character ROM: ignore
-        } else {
-            if self.mem[1] & 0b0100_0000 != 0b0100_0000 {
+            } else {
                 self.mem[addr as usize] = byte;
             }
+        } else {
+            // Writes always go to RAM, regardless of bank setting
+            //if self.mem[1] & 0b0100_0000 != 0b0100_0000 {
+            self.mem[addr as usize] = byte;
+            //}
         }
     }
     pub fn read_word(&self, video: &Video, cia1: &Cia1, addr: u16) -> u16 {
