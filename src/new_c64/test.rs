@@ -721,3 +721,258 @@ fn test_bank_switch() {
         cpu.step(&mut mem,&mut video, &mut cia1);
     }
 }
+
+#[test]
+fn test_asl_1() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "SEC",
+        "LDA #$03",
+        "LDX #$01",
+        "STA $C1",
+        "ASL $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_clear(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(6, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_asl_2() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$83",
+        "LDX #$01",
+        "STA $C1",
+        "ASL $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(6, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_asl_3() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$80",
+        "LDX #$01",
+        "STA $C1",
+        "ASL $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_set(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(0, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_asl_4() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$C0",
+        "LDX #$01",
+        "STA $C1",
+        "ASL $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Negative));
+    assert_eq!(0x80, mem.read(&video, &cia1, 0xc1));
+}
+#[test]
+fn test_lsr_1() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "SEC",
+        "LDA #$C0",
+        "LDX #$01",
+        "STA $C1",
+        "LSR $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_clear(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(0x60, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_lsr_2() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$C1",
+        "LDX #$01",
+        "STA $C1",
+        "LSR $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(0x60, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_lsr_3() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$01",
+        "LDX #$01",
+        "STA $C1",
+        "LSR $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_set(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(0, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_lsr_4() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$03",
+        "LDX #$01",
+        "STA $C1",
+        "LSR $C0,X"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_clear(StatusFlag::Negative));
+    assert_eq!(1, mem.read(&video, &cia1, 0xc1));
+}

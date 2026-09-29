@@ -252,6 +252,7 @@ impl <'a,'b,'c,'d,'v> Execution<'a,'b,'c,'d,'v> {
             Instruction::LSR => {
                 self.cpu.check_and_set_or_clear_flag(StatusFlag::Carry, self.cpu.tmp[0] & 0x1);
                 self.cpu.tmp[0] >>= 1;
+                self.cpu.check_and_set_nz_flags(self.cpu.tmp[0]);
             }
             Instruction::NOP => {}
             Instruction::ORA => {
@@ -299,7 +300,10 @@ impl <'a,'b,'c,'d,'v> Execution<'a,'b,'c,'d,'v> {
                 let old_carry = self.cpu.is_set(StatusFlag::Carry);
                 self.cpu.check_and_set_or_clear_flag(StatusFlag::Carry, self.cpu.tmp[0] & 0x80);
                 self.cpu.tmp[0] <<= 1;
-                self.cpu.tmp[0] |= if old_carry { 1 } else { 0 };
+                if old_carry {
+                    self.cpu.tmp[0] |= 1;
+                }
+                self.cpu.check_and_set_nz_flags(self.cpu.tmp[0]);
             }
             Instruction::ROR => {
                 let old_carry = self.cpu.is_set(StatusFlag::Carry);
@@ -343,7 +347,7 @@ impl <'a,'b,'c,'d,'v> Execution<'a,'b,'c,'d,'v> {
                 self.cpu.check_and_set_nz_flags(self.cpu.a);
             }
             Instruction::SEC => self.cpu.set_flag(StatusFlag::Carry),
-            Instruction::SED => self.cpu.set_flag(StatusFlag::Decimal),
+            Instruction::SED => todo!(), // self.cpu.set_flag(StatusFlag::Decimal),
             Instruction::SEI => self.cpu.set_flag(StatusFlag::IRQDisable),
             Instruction::SMB0 => self.mem.write(self.video, self.cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x01),
             Instruction::SMB1 => self.mem.write(self.video, self.cia1, self.cpu.tmp_addr, self.cpu.tmp[0] & !0x02),
