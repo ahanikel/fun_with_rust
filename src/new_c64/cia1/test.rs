@@ -97,8 +97,9 @@ fn test_1() {
                 "ORA #$11",
                 "STA $DC0E",
     ];
-    mem.write(&mut video, &mut cia1, 1, 0b1000_0000); // all RAM except I/O
-    let mut origin = 0xa000;
+    mem.write(&mut video, &mut cia1, 0, 0x2f);
+    mem.write(&mut video, &mut cia1, 1, 0x35); // bit 1 unset => no kernal
+    let mut origin = 0x8000;
     for line in code {
         let bytes = asm(line, origin).unwrap();
         for byte in bytes {
@@ -107,7 +108,7 @@ fn test_1() {
         }
     }
     mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
-    mem.write(&mut video, &mut cia1, 0xfffd, 0xa0);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0x80);
     cpu.reset(&mut mem, &mut video, &mut cia1);
     for _ in 0..13 {
         cpu.step(&mut mem, &mut video, &mut cia1);

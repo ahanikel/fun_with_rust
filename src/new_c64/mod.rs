@@ -1,9 +1,9 @@
-mod char_rom;
-mod memory;
-mod cpu;
-mod video;
-mod cia1;
-mod app_handler;
+pub mod char_rom;
+pub mod memory;
+pub mod cpu;
+pub mod video;
+pub mod cia1;
+pub mod app_handler;
 
 use std::path::Path;
 

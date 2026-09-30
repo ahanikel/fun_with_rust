@@ -189,7 +189,6 @@ impl Cpu {
                 self.change_flags(&[StatusFlag::IRQDisable], &[StatusFlag::Decimal]);
                 self.pc = mem.read_word(video, cia1, 0xfffe);
                 self.cycles = 7;
-                info!("Starting interrupt handler at {:04X}", &self.pc)
             }
             self.irq = false;
             return;

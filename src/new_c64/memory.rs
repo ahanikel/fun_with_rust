@@ -1,8 +1,6 @@
-#[cfg(test)]
 use std::ops::Range;
 use std::{io::Read, path::Path};
 
-use tracing::info;
 
 use crate::new_c64::{cia1::Cia1, video::Video};
 
@@ -97,7 +95,6 @@ impl Memory {
      */
     pub fn write(&mut self, video: &mut Video, cia1: &mut Cia1, addr: u16, byte: u8) {
         if addr == 0x1 {
-            info!("Modifying 0x1: {:08b}", byte);
             self.mem[addr as usize] = byte;
         } else if addr < 0xa000 {
             self.mem[addr as usize] = byte;
@@ -148,7 +145,6 @@ impl Memory {
         self.write(video, cia1, addr, bytes[0]);
         self.write(video, cia1, addr.wrapping_add(1), bytes[1]);
     }
-    #[cfg(test)]
     // Note: this does not work for devices
     pub fn set_range(&mut self, range: Range<usize>, src: Vec<u8>) {
         let mem = &mut self.mem[range.clone()];

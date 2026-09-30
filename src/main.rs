@@ -1,25 +1,11 @@
 use std::{
-    cell::RefCell,
-    io::{Write, stdin},
-    path::PathBuf,
-    rc::Rc,
+    fs::File, io::{Read, stdin}, path::PathBuf,
 };
 
 use clap::{Parser, Subcommand};
-use tracing::info;
 
-use crate::{
-    cpu6502::{
-        acia::Acia,
-        cpu::CPU,
-        memory::{Memory, MemoryDevice, MemoryFromFile},
-        model,
-        video,
-    },
-    video::{AppHandler, Video, cia1::Cia1, control::Control},
-};
+use crate::new_c64::{cia1::Cia1, cpu::model, memory::Memory, video::Video};
 
-mod cpu6502;
 mod heap;
 mod new_c64;
 
@@ -32,16 +18,7 @@ struct CmdArgs {
 
 #[derive(Subcommand)]
 enum Subcommands {
-    Wozmon,
     C64 {
-        #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
-        kernal: PathBuf,
-        #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
-        basic: PathBuf,
-        #[arg(short, long)]
-        verbose: bool,
-    },
-    C64Old {
         #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
         kernal: PathBuf,
         #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
@@ -60,6 +37,10 @@ enum Subcommands {
         #[arg(long, short)]
         origin: Option<usize>,
         end: Option<usize>,
+        #[arg(short, long, default_value = "test-resources/kernal.901227-03.bin")]
+        kernal: PathBuf,
+        #[arg(short, long, default_value = "test-resources/basic.901226-01.bin")]
+        basic: PathBuf,
     },
     Heap,
 }
@@ -68,12 +49,8 @@ fn main() {
     tracing_subscriber::fmt::init();
     let cmd_args = CmdArgs::parse();
     match cmd_args.subcommands {
-        Subcommands::Wozmon => wozmon(),
         Subcommands::C64 { kernal, basic, verbose } => {
             new_c64::c64(&kernal, &basic, verbose);
-        }
-        Subcommands::C64Old { kernal, basic, verbose } => {
-            c64(kernal.to_str().unwrap(), basic.to_str().unwrap(), verbose)
         }
         Subcommands::Asm { file, origin } => {
             match file {
@@ -81,69 +58,9 @@ fn main() {
                 _ => asm(None, origin),
             };
         }
-        Subcommands::Disasm { file, origin, end } => disasm(file.to_str().unwrap(), origin, end),
+        Subcommands::Disasm { file, origin, end, kernal, basic } => disasm(file.to_str().unwrap(), origin, end, kernal, basic),
         Subcommands::Heap => run_heap(),
     }
-}
-
-fn wozmon() {
-    info!("Application starting");
-    let out_fn = |b: u8| {
-        if b == b'\r' {
-            std::io::stdout().write_all(b"\n").unwrap(); // Wozmon uses \r for line breaks
-        } else {
-            std::io::stdout().write_all(&[b]).unwrap();
-        }
-        std::io::stdout().flush().unwrap();
-    };
-    let mut cpu: CPU = CPU::new();
-    cpu.log_instructions = None;
-    let wozmon = Rc::new(RefCell::new(MemoryFromFile::new(
-        "test-resources/test-image",
-    )));
-    let acia = Rc::new(RefCell::new(Acia::new(Some(Rc::new(RefCell::new(out_fn))))));
-    #[allow(unused)]
-    let acia_sender = acia.borrow_mut().start();
-    let mut mem = Memory::new();
-    mem.register_device(wozmon, 0x8000, 0xffff);
-    mem.register_device(acia.clone(), 0x5000, 0x5003);
-    cpu.reset(&mut mem);
-    loop {
-        cpu.step(&mut mem);
-        if let Some(thr) = &acia.borrow().input_thread {
-            if thr.is_finished() {
-                break;
-            }
-        }
-    }
-}
-
-fn c64(kernal_file: &str, basic_file: &str, verbose: bool) {
-    info!("Application starting");
-    let mut log_fn = |s: &str| {
-        info!(s);
-    };
-    let mut cpu: CPU = CPU::new();
-    if verbose {
-        cpu.log_instructions = Some(&mut log_fn);
-    }
-    let mut mem = Memory::new();
-    let video_ram = Rc::new(RefCell::new(MemoryDevice::new(0x400)));
-    mem.register_device(video_ram, 0x400, 0x7ff);
-    let color_ram = Rc::new(RefCell::new(MemoryDevice::new(0x400)));
-    mem.register_device(color_ram, 0xd800, 0xdbff);
-    let kernal = Rc::new(RefCell::new(MemoryFromFile::new(kernal_file)));
-    mem.register_device(kernal, 0xe000, 0xffff);
-    let basic = Rc::new(RefCell::new(MemoryFromFile::new(basic_file)));
-    mem.register_device(basic, 0xa000, 0xbfff);
-    let control = Rc::new(RefCell::new(Control::new()));
-    let video = Video::new(control.clone(), 0x400, 0xd800);
-    mem.register_device(control, 0xd000, 0xd3ff);
-    cpu.reset(&mut mem);
-    let cia1 = Cia1::new();
-    let mut app = AppHandler::new(cpu, video, mem, cia1);
-    info!("Running event loop");
-    app.run();
 }
 
 fn run_heap() {
@@ -161,16 +78,20 @@ fn run_heap() {
     }
 }
 
-fn disasm(file: &str, origin: Option<usize>, end: Option<usize>) {
-    let mut mem = Memory::new();
-    let mem_file = Rc::new(RefCell::new(MemoryFromFile::new(file)));
+fn disasm(file: &str, origin: Option<usize>, end: Option<usize>, kernal: PathBuf, basic: PathBuf) {
+    let mut mem = Memory::new(&kernal, &basic);
+    let mut mem_file = File::open(file).expect("Unable to open file {file}");
+    let mut buf = Vec::new();
+    mem_file.read_to_end(&mut buf).expect("Unable to read file {file}");
     let org = origin.unwrap_or(0);
-    let len = mem_file.borrow().mem.len();
+    let len = buf.len();
     let end = end.unwrap_or(org + len - 3);
-    mem.register_device(mem_file, org, org + len);
+    mem.set_range(org..org+len, buf);
     let mut pc = org;
+    let video = Video::default();
+    let cia1 = Cia1::new();
     while pc < end {
-        let (s, size) = model::disasm_and_len(pc as u16, &mut mem);
+        let (s, size) = model::disasm_and_len(pc as u16, &mut mem, &video, &cia1);
         println!("{:04X} {}", pc, s);
         pc += size as usize;
     }

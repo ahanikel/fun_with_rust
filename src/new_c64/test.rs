@@ -10,10 +10,14 @@ fn test_brk_rti() {
     let mut mem = Memory::new_for_testing();
     let mut video = Video::default();
     let mut cia1 = Cia1::new();
+    mem.write(&mut video, &mut cia1, 0, 0x2f);
+    mem.write(&mut video, &mut cia1, 1, 0x35); // bit 1 unset => no kernal
+    mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0x80);
     cpu.reset(&mut mem, &mut video, &mut cia1);
     mem.write(&mut video, &mut cia1, 0xfffe, 0xee);
     mem.write(&mut video, &mut cia1, 0xffff, 0xee);
-    mem.write(&mut video, &mut cia1, 0xeef0, 0x40); // RTI
+    mem.write(&mut video, &mut cia1, 0xeeef, 0x40); // RTI
     for step in 0..14 {
         print!("Step {step}: ");
         cpu.step(&mut mem,&mut video, &mut cia1);
@@ -27,14 +31,14 @@ fn test_brk_rti() {
     }
     assert!(cpu.is_set(StatusFlag::BRK));
     assert!(cpu.is_set(StatusFlag::IRQDisable));
-    assert_eq!(0xeef0, cpu.pc);
+    assert_eq!(0xeeef, cpu.pc);
     for step in 16..18 {
         print!("Step {step}: ");
         cpu.step(&mut mem,&mut video, &mut cia1);
     }
     assert!(cpu.is_clear(StatusFlag::BRK));
     assert!(cpu.is_clear(StatusFlag::IRQDisable));
-    assert_eq!(0x0002, cpu.pc);
+    assert_eq!(0x8001, cpu.pc);
 }
 
 #[test]
