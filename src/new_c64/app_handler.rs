@@ -156,12 +156,11 @@ impl ApplicationHandler for AppHandler<'_> {
         }
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if self.cia1.step() {
-            if self.cia1.is_timer_a_underrun() {
-                self.video.redraw_screen(&mut self.mem, &mut self.cia1);
+        if self.cia1.step()
+            && self.cia1.is_timer_a_underrun() {
+                self.video.redraw_screen(&self.mem, &self.cia1);
                 self.cpu.request_interrupt();
             }
-        }
         self.cpu.step(&mut self.mem, &mut self.video, &mut self.cia1);
         if self.video.step(&self.mem, &self.cia1) {
             info!("Raster interrupt");

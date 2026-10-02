@@ -130,7 +130,7 @@ impl<'a> Video<'a> {
                         let ch = mem.read(self, cia1, self.ram_base + offset);
                         let fg_col = mem.read(self, cia1, self.color_ram_base + offset);
                         let bg_col = self.regs.get_background_color();
-                        self.do_char_at(ch, col, row, fg_col, bg_col as u8);
+                        self.do_char_at(ch, col, row, fg_col, bg_col);
                     }
                 }
             }
@@ -140,12 +140,8 @@ impl<'a> Video<'a> {
     }
 
     pub fn render_pixels(&mut self) {
-        if let Some(p) = self.pixels.as_mut() {
-            match p.render() {
-                Err(e) => warn!("Failed to render pixels: {:?}", e),
-                _ => {},
-            }
-        }
+        if let Some(p) = self.pixels.as_mut()
+            && let Err(e) = p.render() { warn!("Failed to render pixels: {:?}", e) }
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -161,11 +157,11 @@ impl<'a> Video<'a> {
      */
     pub fn step(&mut self, mem: &Memory, cia1: &Cia1) -> bool {
         self.pseudo_pixel_counter = self.pseudo_pixel_counter.wrapping_add(1);
-        if self.pseudo_pixel_counter % self.system.x_max == 0 {
+        if self.pseudo_pixel_counter.is_multiple_of(self.system.x_max) {
             self.inc_current_raster_line();
         }
 
-        if self.pseudo_pixel_counter % 20000 == 0 {
+        if self.pseudo_pixel_counter.is_multiple_of(20000) {
             self.redraw_screen(mem, cia1);
             if let Some(w) = &mut self.window {
                 w.request_redraw();

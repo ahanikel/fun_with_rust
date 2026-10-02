@@ -59,7 +59,7 @@ pub struct ParseAddrModeError{ s: String }
 
 impl Display for ParseAddrModeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("ParseAddrModeError: Unable to parse {}", &self.s).as_str())
+        f.write_str(format!("ParseAddrModeError: Unable to parse {}", self.s).as_str())
     }
 }
 
@@ -74,15 +74,16 @@ impl FromStr for AddrMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let rparen = s.find(')');
         let comma = s.find(',');
-        let selector = (s.bytes().nth(0), s.bytes().nth(1), rparen, comma);
-        let ret = match selector {
+        let selector = (s.as_bytes().first().copied(), s.as_bytes().get(1).copied(), rparen, comma);
+        
+        match selector {
             (Some(b'$'), Some(c),None,None) if c != b'(' && s.len() == 5 =>
               Ok(AddrMode::Absolute),
             (Some(b'('), Some(b'$'),Some(rp),Some(co)) if co < rp && s.len() == 7 =>
               Ok(AddrMode::AbsoluteIndexedIndirect),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'X') && s.len() == 9 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'X') && s.len() == 9 =>
               Ok(AddrMode::AbsoluteIndexedWithX),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'Y') && s.len() == 9 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'Y') && s.len() == 9 =>
               Ok(AddrMode::AbsoluteIndexedWithY),
             (Some(b'('), Some(b'$'), Some(_),None) if s.len() == 7 =>
               Ok(AddrMode::AbsoluteIndirect),
@@ -94,17 +95,16 @@ impl FromStr for AddrMode {
               Ok(AddrMode::ZeroPage),
             (Some(b'('), Some(b'$'),Some(rp),Some(co)) if co < rp && s.len() == 5 =>
               Ok(AddrMode::ZeroPageIndexedIndirect),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'X') && s.len() == 7 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'X') && s.len() == 7 =>
               Ok(AddrMode::ZeroPageIndexedWithX),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'Y') && s.len() == 7 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'Y') && s.len() == 7 =>
               Ok(AddrMode::ZeroPageIndexedWithY),
             (Some(b'('), Some(b'$'), Some(_),None) if s.len() == 5 =>
               Ok(AddrMode::ZeroPageIndirect),
             (Some(b'('), Some(b'$'),Some(rp),Some(co)) if co > rp && s.len() == 5 =>
               Ok(AddrMode::ZeroPageIndirectIndexedWithY),
             _ => Err(ParseAddrModeError { s: s.to_owned() }),
-        };
-        ret
+        }
     }
 }
 
@@ -132,15 +132,15 @@ impl FromStr for AddrModeWithAddr {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let rparen = s.find(')');
         let comma = s.find(',');
-        let selector = (s.bytes().nth(0), s.bytes().nth(1), rparen, comma);
+        let selector = (s.as_bytes().first().copied(), s.as_bytes().get(1).copied(), rparen, comma);
         let ret = match selector {
             (Some(b'$'), Some(c),None,None) if c != b'(' && s.len() == 5 =>
               (AddrMode::Absolute, u16::from_str_radix(&s.to_owned()[1..5], 16)?, 2),
             (Some(b'('), Some(b'$'),Some(rp),Some(co)) if co < rp && s.len() == 9 =>
               (AddrMode::AbsoluteIndexedIndirect, u16::from_str_radix(&s.to_owned()[2..6], 16)?, 2),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'X') && s.len() == 7 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'X') && s.len() == 7 =>
               (AddrMode::AbsoluteIndexedWithX, u16::from_str_radix(&s.to_owned()[1..5], 16)?, 2),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'Y') && s.len() == 7 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'Y') && s.len() == 7 =>
               (AddrMode::AbsoluteIndexedWithY, u16::from_str_radix(&s.to_owned()[1..5], 16)?, 2),
             (Some(b'('), Some(b'$'), Some(_),None) if s.len() == 7 =>
               (AddrMode::AbsoluteIndirect, u16::from_str_radix(&s.to_owned()[2..6], 16)?, 2),
@@ -150,9 +150,9 @@ impl FromStr for AddrModeWithAddr {
               (AddrMode::ZeroPage, u16::from_str_radix(&s.to_owned()[1..3], 16)?, 1),
             (Some(b'('), Some(b'$'),Some(rp),Some(co)) if co < rp && s.len() == 7 =>
               (AddrMode::ZeroPageIndexedIndirect, u16::from_str_radix(&s.to_owned()[2..4], 16)?, 1),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'X') && s.len() == 5 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'X') && s.len() == 5 =>
               (AddrMode::ZeroPageIndexedWithX, u16::from_str_radix(&s.to_owned()[1..3], 16)?, 1),
-            (Some(b'$'), Some(_), None,Some(co)) if s.bytes().nth(co+1) == Some(b'Y') && s.len() == 5 =>
+            (Some(b'$'), Some(_), None,Some(co)) if s.as_bytes().get(co+1).copied() == Some(b'Y') && s.len() == 5 =>
               (AddrMode::ZeroPageIndexedWithY, u16::from_str_radix(&s.to_owned()[1..3], 16)?, 1),
             (Some(b'('), Some(b'$'), Some(_),None) if s.len() == 5 =>
               (AddrMode::ZeroPageIndirect, u16::from_str_radix(&s.to_owned()[2..4], 16)?, 1),

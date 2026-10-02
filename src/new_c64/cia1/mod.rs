@@ -225,7 +225,7 @@ impl Cia1 {
             0xd => self.interrupt_status,
             0xe => self.timer_a_ctrl,
             0xf => self.timer_b_ctrl,
-            _ if addr >= 0x10 && addr <= 0xff => self.read(addr % 0x10),
+            _ if (0x10..=0xff).contains(&addr) => self.read(addr % 0x10),
             _ => panic!("Should not happen (misconfiguration)"),
         }
     }
@@ -278,7 +278,7 @@ impl Cia1 {
             }
             0xe => self.timer_a_ctrl = byte,
             0xf => self.timer_b_ctrl = byte,
-            _ if addr >= 0x10 && addr <= 0xff => self.write(addr % 0x10, byte),
+            _ if (0x10..=0xff).contains(&addr) => self.write(addr % 0x10, byte),
             _ => panic!("Should not happen (misconfiguration)"),
         }
     }

@@ -39,9 +39,9 @@ pub enum StatusFlag {
     Negative,
 }
 
-impl Into<u8> for StatusFlag {
-    fn into(self) -> u8 {
-        match self {
+impl From<StatusFlag> for u8 {
+    fn from(val: StatusFlag) -> Self {
+        match val {
             StatusFlag::Carry => 1,
             StatusFlag::Zero => 2,
             StatusFlag::IRQDisable => 4,
