@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::new_c64::{cia1::Cia1, cpu::{Cpu, StatusFlag, model::{addr_mode::AddrMode, asm_into, instruction::Instruction, opcode_from_instruction_and_mode}}, memory::Memory, video::Video};
 
@@ -853,6 +853,68 @@ fn test_asl_4() {
     assert!(cpu.is_set(StatusFlag::Negative));
     assert_eq!(0x80, mem.read(&video, &cia1, 0xc1));
 }
+
+#[test]
+fn test_rol_1() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "LDA #$DF",
+        "SEC",
+        "ROL"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..15 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Negative));
+    assert_eq!(0xbf, cpu.a);
+}
+
+#[test]
+fn test_asl_5() {
+    let mut cpu = Cpu::new(true);
+    let mut mem = Memory::new_for_testing();
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "CLC",
+        "LDA #$FF",
+        "STA $C1",
+        "ASL $C1"
+    ];
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0xb000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0..22 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    // Bit 7 goes into carry
+    assert!(cpu.is_set(StatusFlag::Carry));
+    assert!(cpu.is_clear(StatusFlag::Zero));
+    assert!(cpu.is_set(StatusFlag::Negative));
+    assert_eq!(0xfe, mem.read(&video, &cia1, 0xc1));
+}
+
 #[test]
 fn test_lsr_1() {
     let mut cpu = Cpu::new(true);
@@ -979,4 +1041,72 @@ fn test_lsr_4() {
     assert!(cpu.is_clear(StatusFlag::Zero));
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert_eq!(1, mem.read(&video, &cia1, 0xc1));
+}
+
+#[test]
+fn test_bdcd() {
+    let mut cpu = Cpu::new(true);
+    let kernal: PathBuf = "test-resources/kernal.901227-03.bin".into();
+    let basic: PathBuf =  "test-resources/basic.901226-01.bin".into();
+    let mut mem = Memory::new(&kernal, &basic);
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let prog = [
+        "LDA #$FF",
+        "LDX #$97",
+        "JSR $BDCD",
+        "NOP",
+    ];
+    mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0x80);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0x8000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _ in 0.. {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+}
+
+#[test]
+fn test_bc49() {
+    let mut cpu = Cpu::new(true);
+    let kernal: PathBuf = "test-resources/kernal.901227-03.bin".into();
+    let basic: PathBuf =  "test-resources/basic.901226-01.bin".into();
+    let mut mem = Memory::new(&kernal, &basic);
+    let mut video = Video::default();
+    let mut cia1 = Cia1::new();
+    let fac = [0x90, 0x97, 0xff, 0x00, 0x00, 0x00];
+    mem.set_range(0x61..0x67, fac.to_vec());
+    let prog = [
+        //"JSR $BC49",
+        "JSR $BDDD",
+        "NOP",
+    ];
+    mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
+    mem.write(&mut video, &mut cia1, 0xfffd, 0x80);
+    cpu.reset(&mut mem, &mut video, &mut cia1);
+    cpu.pc = 0x8000;
+    let mut code = Vec::new();
+    for line in prog {
+        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
+    }
+    let from = cpu.pc as usize;
+    let to = from + code.len();
+    mem.set_range(from..to, code);
+    for _step in 0..13292 {
+        cpu.step(&mut mem, &mut video, &mut cia1);
+    }
+    assert_eq!(0x20, mem.read(&video, &cia1, 0x100));
+    assert_eq!(0x33, mem.read(&video, &cia1, 0x101));
+    assert_eq!(0x38, mem.read(&video, &cia1, 0x102));
+    assert_eq!(0x39, mem.read(&video, &cia1, 0x103));
+    assert_eq!(0x31, mem.read(&video, &cia1, 0x104));
+    assert_eq!(0x31, mem.read(&video, &cia1, 0x105));
+    assert_eq!(0x00, mem.read(&video, &cia1, 0x106));
 }
