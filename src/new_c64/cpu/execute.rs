@@ -100,8 +100,9 @@ impl <'a,'b,'c,'d,'v> Execution<'a,'b,'c,'d,'v> {
                 // we set the overflow flag iff one occurred during either addition
                 self.cpu.set_or_clear_flag(StatusFlag::Overflow, ofl1 || ofl2);
 
-                // we set the carry flag iff the result is smaller than the first operand
-                self.cpu.set_or_clear_flag(StatusFlag::Carry, self.cpu.a < a);
+                // we set the carry flag iff the full sum does not fit into a byte
+                let sum = a as u16 + b as u16 + d as u16;
+                self.cpu.set_or_clear_flag(StatusFlag::Carry, sum > 0xff);
                 self.cpu.check_and_set_nz_flags(self.cpu.a);
             }
             Instruction::AND => {

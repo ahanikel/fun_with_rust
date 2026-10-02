@@ -346,6 +346,17 @@ fn test_sbc_8() {
 }
 
 fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_carry: bool) {
+    _test_adc_with_carry(a, b, false, expected_res, expected_overflow, expected_carry);
+}
+
+fn _test_adc_with_carry(
+    a: u8,
+    b: u8,
+    carry_in: bool,
+    expected_res: u8,
+    expected_overflow: bool,
+    expected_carry: bool,
+) {
     let mut cpu = Cpu::new(true);
     let mut mem = Memory::new_for_testing();
     let mut video = Video::default();
@@ -353,7 +364,10 @@ fn _test_adc(a: u8, b: u8, expected_res: u8, expected_overflow: bool, expected_c
     let prog = [
         opcode_from_instruction_and_mode(Instruction::LDA, AddrMode::Immediate),
         a,
-        opcode_from_instruction_and_mode(Instruction::CLC, AddrMode::Implied),
+        opcode_from_instruction_and_mode(
+            if carry_in { Instruction::SEC } else { Instruction::CLC },
+            AddrMode::Implied,
+        ),
         opcode_from_instruction_and_mode(Instruction::ADC, AddrMode::Immediate),
         b,
     ];
@@ -478,6 +492,23 @@ fn test_adc_6() {
  */
 fn test_adc_7() {
     _test_adc(6, 3, 9, false, false);
+}
+
+#[test]
+/**
+ * Carry occurs even though the result equals the accumulator.
+ * We compute $C3 + $FF + 1 = $1C3, i.e. adding -1 with carry in, as the
+ * multi-byte addition in FOUT ($BE6A) does.
+ * Unsigned perspective: 195 + 255 + 1 = 451, which does not fit into a byte.
+ *   The result wraps to 195 ($C3) and carry occurs (carry = 1).
+ * Signed perspective: -61 + (-1) + 1 = -61, which fits fine. No overflow.
+ */
+fn test_adc_8() {
+    _test_adc_with_carry(0xc3, 0xff, true, 0xc3, false, true);
+    _test_adc_with_carry(0x00, 0xff, true, 0x00, false, true);
+    _test_adc_with_carry(0xff, 0xff, true, 0xff, false, true);
+    // without carry in, the same operands must not produce a carry
+    _test_adc_with_carry(0x00, 0xff, false, 0xff, false, false);
 }
 
 #[test]
@@ -1041,36 +1072,6 @@ fn test_lsr_4() {
     assert!(cpu.is_clear(StatusFlag::Zero));
     assert!(cpu.is_clear(StatusFlag::Negative));
     assert_eq!(1, mem.read(&video, &cia1, 0xc1));
-}
-
-#[test]
-fn test_bdcd() {
-    let mut cpu = Cpu::new(true);
-    let kernal: PathBuf = "test-resources/kernal.901227-03.bin".into();
-    let basic: PathBuf =  "test-resources/basic.901226-01.bin".into();
-    let mut mem = Memory::new(&kernal, &basic);
-    let mut video = Video::default();
-    let mut cia1 = Cia1::new();
-    let prog = [
-        "LDA #$FF",
-        "LDX #$97",
-        "JSR $BDCD",
-        "NOP",
-    ];
-    mem.write(&mut video, &mut cia1, 0xfffc, 0x00);
-    mem.write(&mut video, &mut cia1, 0xfffd, 0x80);
-    cpu.reset(&mut mem, &mut video, &mut cia1);
-    cpu.pc = 0x8000;
-    let mut code = Vec::new();
-    for line in prog {
-        asm_into(line, cpu.pc + code.len() as u16, &mut code).unwrap();
-    }
-    let from = cpu.pc as usize;
-    let to = from + code.len();
-    mem.set_range(from..to, code);
-    for _ in 0.. {
-        cpu.step(&mut mem, &mut video, &mut cia1);
-    }
 }
 
 #[test]
